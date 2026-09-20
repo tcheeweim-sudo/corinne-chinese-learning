@@ -1,0 +1,100 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Local browser smoke checks</title>
+<h1>Local browser smoke checks</h1>
+<p>Run only on the local test server. App progress is backed up and restored after the functional check.</p>
+<button id="run">Run functional checks</button>
+<button id="inspect">Inspect offline cache</button>
+<pre id="results" aria-live="polite"></pre>
+<iframe id="app" title="App under test" style="width:390px;height:844px;border:1px solid #ccc"></iframe>
+<script>
+const frame = document.getElementById('app');
+const output = document.getElementById('results');
+const log = message => { output.textContent += message + '\n'; };
+const assert = (condition, message) => { if (!condition) throw Error(message); };
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+const load = () => new Promise(resolve => { frame.onload = resolve; frame.src = '../'; });
+const state = () => JSON.parse(localStorage.getItem('corinne-zh-v0'));
+document.getElementById('run').onclick = async () => {
+  if (!['127.0.0.1', 'localhost'].includes(location.hostname)) return;
+  const backup = localStorage.getItem('corinne-zh-v0');
+  output.textContent = '';
+  try {
+    localStorage.setItem('corinne-zh-v0', '{}');
+    await load();
+    let doc = frame.contentDocument;
+    const click = id => doc.getElementById(id).click();
+    const answer = (mode, wrongFirst = false) => {
+      const hint = mode === 'mission' ? doc.getElementById('missionHint').textContent : doc.querySelector('#recallPrompt .prompt-main').textContent;
+      const item = frame.contentWindow.CURRICULUM.find(item => item.pinyin === hint);
+      const buttons = [...doc.querySelectorAll(`#${mode}Choices button`)];
+      if (wrongFirst) buttons.find(button => button.textContent !== item.target).click();
+      const correct = buttons.find(button => button.textContent === item.target);
+      correct.click();
+      const earned = state().coins;
+      correct.click();
+      assert(state().coins === earned && buttons.every(button => button.disabled), 'Answer was not locked');
+    };
+    click('startMission');
+    answer('mission', true);
+    assert(JSON.stringify(state().questionMetrics) === JSON.stringify({attempted:1,responses:2,firstCorrect:0,completed:1}), 'Retry metric counts');
+    click('missionNext');
+    for (let i = 1; i < 7; i++) { answer('mission'); click('missionNext'); }
+    assert(state().badges[0] === '🐼', 'First badge must be panda');
+    assert(state().coins === 29 && state().streak === 1, 'Initial mission rewards');
+    const earned = state().coins;
+    click('startMission');
+    for (let i = 0; i < 7; i++) { answer('mission'); click('missionNext'); }
+    assert(state().coins === earned && state().streak === 1 && state().badges.length === 1, 'Mission replay farming');
+    log('PASS: first badge, retry/first-attempt metrics, answer locking, replay anti-farming, same-day streak');
+    doc.querySelector('[data-go="recall"]').click();
+    for (let i = 0; i < 5; i++) { answer('recall'); click('recallNext'); }
+    assert(state().questionMetrics.attempted === 19 && state().questionMetrics.responses === 20 && state().questionMetrics.firstCorrect === 18 && state().questionMetrics.completed === 19, 'Recall metrics');
+    assert(doc.getElementById('recallPrompt').textContent.includes('complete'), 'Recall completion');
+    click('openParent');
+    assert(doc.getElementById('parentMetrics').textContent.includes('Overall question completion'), 'Parent labels');
+    const saved = JSON.stringify(state());
+    await load(); doc = frame.contentDocument;
+    assert(JSON.stringify(state()) === saved && doc.getElementById('coins').textContent === '29', 'Reload persistence');
+    log('PASS: recall, parent labels, local progress reload');
+    // Legacy history must not be presented as newly measured question counts.
+    localStorage.setItem('corinne-zh-v0', JSON.stringify({coins:8,quizAttempts:10,correctAnswers:4}));
+    await load(); doc = frame.contentDocument; click('openParent');
+    assert(doc.getElementById('coins').textContent === '8', 'Legacy coins lost');
+    assert(doc.getElementById('parentMetrics').textContent.startsWith('0Questions attempted'), 'Legacy taps mislabelled');
+    log('PASS: legacy migration preserves coins without inventing first-attempt history');
+    localStorage.setItem('corinne-zh-v0', '{broken');
+    await load(); doc = frame.contentDocument;
+    assert(doc.getElementById('coins').textContent === '0', 'Malformed storage recovery');
+    log('PASS: malformed local storage');
+  } catch (error) { log('FAIL: ' + error.message); }
+  finally {
+    if (backup === null) localStorage.removeItem('corinne-zh-v0');
+    else localStorage.setItem('corinne-zh-v0', backup);
+    await load();
+  }
+};
+document.getElementById('inspect').onclick = async () => {
+  output.textContent = '';
+  try {
+    const registration = await navigator.serviceWorker.getRegistration(new URL('../', location.href));
+    assert(registration?.active, 'No active service worker');
+    for (let i = 0; i < 50 && (registration.installing || registration.waiting); i++) await pause(100);
+    const names = (await caches.keys()).filter(name => name.startsWith('corinne-v'));
+    assert(names.length === 1, 'Worker update still in progress; inspect again after activation');
+    log('Active worker: ' + registration.active.scriptURL);
+    log('Controller: ' + (navigator.serviceWorker.controller?.scriptURL || 'none; reload diagnostics'));
+    log('Cache versions: ' + names.join(', '));
+    const cache = await caches.open(names[names.length - 1]);
+    const keys = await cache.keys();
+    const characters = keys.filter(request => request.url.includes('/character-data/'));
+    assert(characters.length === 19, 'Expected all 19 character files');
+    for (const request of characters) {
+      const data = await (await cache.match(request)).json();
+      assert(data.strokes.length > 0, 'Empty character data');
+    }
+    assert(await cache.match(new URL('../index.html', location.href)), 'No cached app shell');
+    log('PASS: cached shell and all 19 valid stroke-data files');
+  } catch (error) { log('FAIL: ' + error.message); }
+};
+</script>
