@@ -1,4 +1,5 @@
-const CACHE_NAME = "corinne-v0.1.1";
+importScripts("./curriculum.js");
+const CACHE_NAME = "corinne-v0.1.3";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -11,7 +12,7 @@ const APP_SHELL = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
-  ...["妈", "爸", "一", "公", "斤", "你", "们", "她", "不", "会", "去", "我", "打", "球", "他", "是", "的", "父", "母"].map((character) => `./character-data/${character}.json`)
+  ...globalThis.REQUIRED_CHARACTERS.map((character) => `./character-data/${encodeURIComponent(character)}.json`)
 ];
 
 self.addEventListener("install", (event) => {
@@ -21,7 +22,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((names) => Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))))
+      .then((names) => Promise.all(names.filter((name) => name.startsWith("corinne-v") && name !== CACHE_NAME).map((name) => caches.delete(name))))
       .then(() => self.clients.claim())
   );
 });
@@ -31,7 +32,7 @@ async function networkFirst(request) {
     const response = await fetch(request);
     if (response.ok) {
       const cache = await caches.open(CACHE_NAME);
-      cache.put(request, response.clone());
+      await cache.put(request, response.clone());
     }
     return response;
   } catch (_error) {

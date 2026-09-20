@@ -28,6 +28,7 @@
       sessionsCompleted: 0,
       quizAttempts: 0,
       correctAnswers: 0,
+      questionMetrics: { attempted: 0, responses: 0, firstCorrect: 0, completed: 0 },
       writingRepetitions: 0,
       badges: [],
       daily: { date: dateKey(), itemIds: [], rewardedMissionItems: [], completed: false },
@@ -57,6 +58,10 @@
       lastSessionDate: typeof saved.lastSessionDate === "string" ? saved.lastSessionDate : "",
       badges: Array.isArray(saved.badges) ? saved.badges.filter((badge) => typeof badge === "string").slice(-20) : []
     };
+    // Earlier versions counted taps only; first-attempt history cannot be inferred.
+    for (const key of Object.keys(state.questionMetrics)) {
+      state.questionMetrics[key] = wholeNumber(saved.questionMetrics?.[key]);
+    }
 
     if (saved.itemStats && typeof saved.itemStats === "object") {
       items.forEach((item) => {
@@ -92,6 +97,7 @@
     if (state.daily.date !== dateKey()) {
       state.daily = { date: dateKey(), itemIds: [], rewardedMissionItems: [], completed: false };
     }
+    state.streak = window.ProgressLogic.currentStreak(state.lastSessionDate, dateKey(), state.streak);
   }
 
   function save() {
@@ -118,6 +124,8 @@
   }
 
   function show(name) {
+    ensureToday();
+    renderStats();
     document.querySelectorAll(".screen").forEach((screen) => screen.classList.toggle("active", screen.id === name));
     document.querySelectorAll("[data-nav]").forEach((button) => button.classList.toggle("active", button.dataset.nav === name));
     if (name === "write") renderWriting();
@@ -166,7 +174,14 @@
     return shuffle([answer, ...shuffle(items.filter((item) => item.id !== answer.id)).slice(0, 3)]);
   }
 
-  function recordAttempt(item, correct) {
+  function recordAttempt(item, correct, responseNumber) {
+    const metrics = state.questionMetrics;
+    metrics.responses += 1;
+    if (responseNumber === 1) metrics.attempted += 1;
+    if (correct) {
+      metrics.completed += 1;
+      if (responseNumber === 1) metrics.firstCorrect += 1;
+    }
     state.quizAttempts += 1;
     state.itemStats[item.id].attempts += 1;
     if (correct) {
@@ -207,8 +222,9 @@
 
   function answerMission(button, isCorrect, item) {
     if (!mission || mission.answered || button.disabled) return;
+    ensureToday();
     mission.tries += 1;
-    recordAttempt(item, isCorrect);
+    recordAttempt(item, isCorrect, mission.tries);
 
     if (!isCorrect) {
       button.disabled = true;
@@ -249,13 +265,14 @@
   }
 
   function finishMission() {
+    ensureToday();
     state.sessionsCompleted += 1;
     if (!state.daily.completed) {
       state.daily.completed = true;
       state.coins += 10;
       state.stars += 5;
       updateDailyStreak();
-      state.badges.push(BADGES[state.sessionsCompleted % BADGES.length]);
+      state.badges.push(BADGES[state.badges.length % BADGES.length]);
     }
     mission = null;
     save();
@@ -290,7 +307,7 @@
   function answerRecall(button, isCorrect, item) {
     if (!recall || recall.answered || button.disabled) return;
     recall.tries += 1;
-    recordAttempt(item, isCorrect);
+    recordAttempt(item, isCorrect, recall.tries);
     if (!isCorrect) {
       button.disabled = true;
       button.classList.add("wrong");
@@ -362,7 +379,7 @@
     if (writing.writer && typeof writing.writer.destroy === "function") writing.writer.destroy();
     $("characterTarget").replaceChildren();
     const stage = document.querySelector(".writing-stage");
-    const size = Math.max(240, Math.min(354, stage.clientWidth - 6));
+    const size = stage.clientWidth;
     writing.writer = HanziWriter.create("characterTarget", character, {
       width: size,
       height: size,
@@ -379,6 +396,19 @@
       charDataLoader: localCharacterLoader,
       onLoadCharDataError: () => { $("writingFeedback").textContent = "This character could not load. Check the app files and try again."; $("writingFeedback").className = "feedback bad"; }
     });
+  }
+
+  // Resize the existing writer so a rotation preserves quiz strokes and callbacks.
+  function resizeWriter() {
+    const size = document.querySelector(".writing-stage").clientWidth;
+    if (writing.writer && size > 0) {
+      writing.writer.updateDimensions({ width: size, height: size, padding: 18 });
+    }
+  }
+  if ("ResizeObserver" in window) {
+    new ResizeObserver(resizeWriter).observe(document.querySelector(".writing-stage"));
+  } else {
+    window.addEventListener("resize", resizeWriter);
   }
 
   function startWritingQuiz() {
@@ -429,11 +459,16 @@
   }
 
   function renderParent() {
-    const accuracy = state.quizAttempts ? Math.round(state.correctAnswers / state.quizAttempts * 100) : 0;
+    const tracked = state.questionMetrics;
+    const accuracy = tracked.attempted ? Math.round(tracked.firstCorrect / tracked.attempted * 100) : 0;
+    const completion = tracked.attempted ? Math.round(tracked.completed / tracked.attempted * 100) : 0;
     const metrics = [
-      ["Quiz attempts", state.quizAttempts],
-      ["Correct answers", state.correctAnswers],
-      ["Accuracy", `${accuracy}%`],
+      ["Questions attempted", tracked.attempted],
+      ["Answer responses (clicks)", tracked.responses],
+      ["Correct on first attempt", tracked.firstCorrect],
+      ["First-attempt accuracy", `${accuracy}%`],
+      ["Questions completed", `${tracked.completed} / ${tracked.attempted}`],
+      ["Overall question completion", `${completion}%`],
       ["Writing successes", state.writingRepetitions],
       ["Sessions finished", state.sessionsCompleted],
       ["Current streak", `${state.streak} day${state.streak === 1 ? "" : "s"}`]
@@ -456,7 +491,7 @@
     if (mission) speak(items[mission.order[mission.step]].target, $("missionFeedback"));
   });
   $("missionNext").addEventListener("click", () => {
-    if (!mission) return;
+    if (!mission || !mission.answered) return;
     if (mission.step < items.length - 1) { mission.step += 1; renderMissionQuestion(); } else finishMission();
   });
   $("recallNext").onclick = nextRecall;
@@ -471,6 +506,6 @@
   renderStats();
 
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").then((registration) => registration.update()).catch(() => {}));
+    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch(() => {}));
   }
 })();

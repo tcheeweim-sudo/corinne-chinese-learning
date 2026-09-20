@@ -1,4 +1,4 @@
-window.CURRICULUM = [
+globalThis.CURRICULUM = [
   { id: "mama", target: "妈妈", pinyin: "mā ma", meaning: "mother" },
   { id: "baba", target: "爸爸", pinyin: "bà ba", meaning: "father" },
   { id: "kg", target: "一公斤", pinyin: "yī gōng jīn", meaning: "one kilogram" },
@@ -8,4 +8,4 @@ window.CURRICULUM = [
   { id: "fumu", target: "他们是我的父母", pinyin: "tā men shì wǒ de fù mǔ", meaning: "They are my parents." }
 ];
 
-window.REQUIRED_CHARACTERS = [...new Set(window.CURRICULUM.flatMap((item) => [...item.target]))];
+globalThis.REQUIRED_CHARACTERS = [...new Set(globalThis.CURRICULUM.flatMap((item) => [...item.target]))];
