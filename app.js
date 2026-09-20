@@ -1,510 +1,410 @@
 (() => {
   "use strict";
 
-  const items = window.CURRICULUM;
-  const STORAGE_KEY = "corinne-zh-v0";
-  const BADGES = ["🐼", "🏮", "🌟", "🎋", "🏆"];
   const $ = (id) => document.getElementById(id);
-  const wholeNumber = (value) => Number.isFinite(Number(value)) && Number(value) >= 0 ? Math.floor(Number(value)) : 0;
-  const shuffle = (values) => [...values].sort(() => Math.random() - 0.5);
+  const set = globalThis.getActiveTingxie();
+  const lesson = globalThis.getMoeLesson(set.lessonId);
+  const items = set.items;
+  const itemById = (id) => items.find((item) => item.id === id);
+  const today = globalThis.ProgressStore.dateKey();
+  const store = globalThis.ProgressStore.createStore({ items, set, today });
+  const audio = new globalThis.CurriculumAudio();
+  const stages = ["intro", "see", "recognise", "write", "recall", "reward"];
+  const writing = { writer: null, observer: null, resizeListener: null };
+  const purchaseLocks = new Set();
 
-  function dateKey(date = new Date()) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-
-  function emptyItemStats() {
-    return Object.fromEntries(items.map((item) => [item.id, { attempts: 0, correct: 0, writes: 0, written: [] }]));
-  }
-
-  function freshState() {
-    return {
-      coins: 0,
-      stars: 0,
-      streak: 0,
-      lastSessionDate: "",
-      sessionsCompleted: 0,
-      quizAttempts: 0,
-      correctAnswers: 0,
-      questionMetrics: { attempted: 0, responses: 0, firstCorrect: 0, completed: 0 },
-      writingRepetitions: 0,
-      badges: [],
-      daily: { date: dateKey(), itemIds: [], rewardedMissionItems: [], completed: false },
-      itemStats: emptyItemStats()
-    };
-  }
-
-  function loadState() {
-    const defaults = freshState();
-    let saved;
-    try {
-      saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    } catch (_error) {
-      return defaults;
+  const shuffle = (values) => {
+    const result = [...values];
+    for (let index = result.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(Math.random() * (index + 1));
+      [result[index], result[swap]] = [result[swap], result[index]];
     }
-    if (!saved || typeof saved !== "object" || Array.isArray(saved)) return defaults;
-
-    const state = {
-      ...defaults,
-      coins: wholeNumber(saved.coins),
-      stars: wholeNumber(saved.stars),
-      streak: wholeNumber(saved.streak),
-      sessionsCompleted: wholeNumber(saved.sessionsCompleted),
-      quizAttempts: wholeNumber(saved.quizAttempts),
-      correctAnswers: wholeNumber(saved.correctAnswers),
-      writingRepetitions: wholeNumber(saved.writingRepetitions),
-      lastSessionDate: typeof saved.lastSessionDate === "string" ? saved.lastSessionDate : "",
-      badges: Array.isArray(saved.badges) ? saved.badges.filter((badge) => typeof badge === "string").slice(-20) : []
-    };
-    // Earlier versions counted taps only; first-attempt history cannot be inferred.
-    for (const key of Object.keys(state.questionMetrics)) {
-      state.questionMetrics[key] = wholeNumber(saved.questionMetrics?.[key]);
-    }
-
-    if (saved.itemStats && typeof saved.itemStats === "object") {
-      items.forEach((item) => {
-        const old = saved.itemStats[item.id] || {};
-        state.itemStats[item.id] = {
-          attempts: wholeNumber(old.attempts),
-          correct: wholeNumber(old.correct),
-          writes: wholeNumber(old.writes),
-          written: Array.isArray(old.written) ? [...new Set(old.written.filter((index) => Number.isInteger(index) && index >= 0 && index < [...item.target].length))] : []
-        };
-      });
-    }
-
-    if (saved.daily && saved.daily.date === dateKey()) {
-      const validIds = new Set(items.map((item) => item.id));
-      state.daily = {
-        date: dateKey(),
-        itemIds: Array.isArray(saved.daily.itemIds) ? [...new Set(saved.daily.itemIds.filter((id) => validIds.has(id)))] : [],
-        rewardedMissionItems: Array.isArray(saved.daily.rewardedMissionItems) ? [...new Set(saved.daily.rewardedMissionItems.filter((id) => validIds.has(id)))] : [],
-        completed: saved.daily.completed === true
-      };
-    }
-    state.streak = window.ProgressLogic.currentStreak(state.lastSessionDate, dateKey(), state.streak);
-    return state;
-  }
-
-  let state = loadState();
-  let mission = null;
-  let recall = null;
-  const writing = { itemIndex: 0, charIndex: 0, writer: null, completed: new Set(), advanceReady: false };
-
-  function ensureToday() {
-    if (state.daily.date !== dateKey()) {
-      state.daily = { date: dateKey(), itemIds: [], rewardedMissionItems: [], completed: false };
-    }
-    state.streak = window.ProgressLogic.currentStreak(state.lastSessionDate, dateKey(), state.streak);
-  }
+    return result;
+  };
+  const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 
   function save() {
-    ensureToday();
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (_error) {
-      // The app remains usable when storage is unavailable.
-    }
-    renderStats();
+    store.save();
+    renderHeader();
   }
 
-  function speak(text, feedbackElement) {
-    if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
-      if (feedbackElement) feedbackElement.textContent = "Speech is not available in this browser.";
-      return false;
+  function ensureMission() {
+    if (!store.state.mission) {
+      store.state.mission = globalThis.MissionPlanner.createMission(set, lesson, store.state, today);
+      save();
     }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "zh-CN";
-    utterance.rate = 0.72;
-    window.speechSynthesis.speak(utterance);
-    return true;
+    return store.state.mission;
   }
 
-  function show(name) {
-    ensureToday();
-    renderStats();
-    document.querySelectorAll(".screen").forEach((screen) => screen.classList.toggle("active", screen.id === name));
-    document.querySelectorAll("[data-nav]").forEach((button) => button.classList.toggle("active", button.dataset.nav === name));
-    if (name === "write") renderWriting();
-    if (name === "recall") startRecall();
-    if (name === "parent") renderParent();
+  function show(screenId) {
+    disposeWriter();
+    document.querySelectorAll(".screen").forEach((screen) => screen.classList.toggle("active", screen.id === screenId));
+    if (screenId === "home") renderHome();
+    if (screenId === "mission") renderMission();
+    if (screenId === "house") renderHouse();
+    if (screenId === "parent") renderParent();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function renderStats() {
-    $("coins").textContent = state.coins;
-    $("stars").textContent = state.stars;
-    $("streak").textContent = state.streak;
-    $("rewardCoins").textContent = state.coins;
-    $("rewardStars").textContent = state.stars;
-    $("badges").textContent = state.badges.length ? state.badges.join(" ") : "Complete today's mission to earn a badge!";
-    const progress = state.daily.itemIds.length;
-    $("fill").style.width = `${progress / items.length * 100}%`;
-    $("progressText").textContent = `${progress} / ${items.length} complete`;
-    $("rewardStatus").textContent = state.daily.completed ? "🎁 Reward collected today!" : "🎁 +10 coins, +5 stars";
-    $("rewardStatus").classList.toggle("reward-ready", state.daily.completed);
-    $("startMission").textContent = state.daily.completed ? "🎯 Practise mission again" : "🎯 Start today's mission";
+  function renderHeader() {
+    $("coinCount").textContent = store.state.coins;
   }
 
-  function renderLists() {
-    $("homeList").replaceChildren();
-    $("learnList").replaceChildren();
-    $("writeSelect").replaceChildren();
-    items.forEach((item, index) => {
-      const row = document.createElement("div");
-      row.className = "word";
-      row.innerHTML = `<b>${index + 1}</b><div><div class="zh">${item.target}</div><div class="sub">${item.pinyin} · ${item.meaning}</div></div><button class="speaker" aria-label="Hear ${item.target}">🔊</button>`;
-      row.querySelector("button").addEventListener("click", () => speak(item.target));
-      $("homeList").append(row);
-      const learnRow = row.cloneNode(true);
-      learnRow.querySelector("button").addEventListener("click", () => speak(item.target));
-      $("learnList").append(learnRow);
+  function missionPercent(mission) {
+    if (!mission) return 0;
+    if (mission.rewardClaimed) return 100;
+    return Math.round((stages.indexOf(mission.stage) / (stages.length - 1)) * 100);
+  }
 
-      const option = document.createElement("option");
-      option.value = String(index);
-      option.textContent = `${index + 1}. ${item.target}`;
-      $("writeSelect").append(option);
-    });
+  function renderHome() {
+    const mission = store.state.mission;
+    const percent = missionPercent(mission);
+    $("homeProgress").style.width = `${percent}%`;
+    $("homeProgressText").textContent = mission?.rewardClaimed ? "Mission complete!" : `${percent}% of today's mission`;
+    $("missionSummary").textContent = `Up to 4 focus items · up to 4 writing characters · about 5 minutes`;
+    $("startMission").textContent = mission ? (mission.rewardClaimed ? "See today's reward" : "Continue mission") : "Start today's mission";
+    renderHeader();
+  }
+
+  function setStage(stage) {
+    const mission = ensureMission();
+    mission.stage = stage;
+    mission.stageIndex = 0;
+    mission.questionTries = 0;
+    mission.currentHints = 0;
+    mission.stageAnswered = false;
+    save();
+    renderMission();
+  }
+
+  function advanceWithinStage(nextStage) {
+    const mission = ensureMission();
+    mission.stageIndex += 1;
+    mission.questionTries = 0;
+    mission.currentHints = 0;
+    mission.stageAnswered = false;
+    if (mission.stage === "see" && mission.stageIndex >= mission.focusIds.length) return setStage("recognise");
+    if (mission.stage === "recognise" && mission.stageIndex >= mission.focusIds.length) return setStage("write");
+    if (mission.stage === "write" && mission.stageIndex >= mission.writingCharacters.length) return setStage("recall");
+    if (mission.stage === "recall" && mission.stageIndex >= mission.focusIds.length) return setStage("reward");
+    save();
+    renderMission();
+  }
+
+  function stageHeader(label, step, count) {
+    return `<div class="mission-top"><span class="stage-pill">${escapeHtml(label)}</span>${count ? `<span class="step-count">${step + 1} / ${count}</span>` : ""}</div>`;
+  }
+
+  function audioButton(item, statusId = "audioStatus") {
+    const button = document.createElement("button");
+    button.className = "listen-button";
+    button.type = "button";
+    button.setAttribute("aria-label", `Hear ${item.target}`);
+    button.innerHTML = "<span aria-hidden=\"true\">🔊</span><span>Listen</span>";
+    button.addEventListener("click", () => audio.play(item, (message, source) => {
+      const status = $(statusId);
+      if (!status) return;
+      status.textContent = message;
+      status.dataset.audioSource = source;
+      if (source === "unavailable") status.textContent += ` ${item.pinyin}`;
+    }));
+    return button;
+  }
+
+  function renderMission() {
+    disposeWriter();
+    const mission = ensureMission();
+    renderHeader();
+    const host = $("missionCard");
+    host.replaceChildren();
+    if (mission.stage === "intro") return renderIntro(host, mission);
+    if (mission.stage === "see") return renderSee(host, mission);
+    if (mission.stage === "recognise") return renderQuestion(host, mission, "recognise");
+    if (mission.stage === "write") return renderWriting(host, mission);
+    if (mission.stage === "recall") return renderQuestion(host, mission, "recall");
+    return renderReward(host, mission);
+  }
+
+  function renderIntro(host, mission) {
+    const focus = mission.focusIds.map((id) => itemById(id));
+    host.innerHTML = `${stageHeader("Tiger intro", 0, 0)}
+      <div class="intro-layout"><img src="./tiger/assets/tiger-placeholder.svg" class="tiger mission-tiger" alt="A friendly orange tiger">
+      <div><p class="tiger-says">Hi Corinne! Let's practise together.</p><h2>Your mission is ready</h2>
+      <p>${focus.length} spelling items and ${mission.writingCharacters.length} writing characters. Take your time.</p></div></div>
+      <button id="introNext" class="btn primary wide">Let's go</button>`;
+    $("introNext").addEventListener("click", () => setStage("see"));
+  }
+
+  function renderSee(host, mission) {
+    const item = itemById(mission.focusIds[mission.stageIndex]);
+    host.innerHTML = `${stageHeader("See & hear", mission.stageIndex, mission.focusIds.length)}
+      <div class="learning-word"><div class="large-hanzi">${escapeHtml(item.target)}</div><div class="pinyin">${escapeHtml(item.pinyin)}</div><div class="meaning">${escapeHtml(item.meaning)}</div></div>
+      <div id="listenMount" class="center"></div><p id="audioStatus" class="audio-status" aria-live="polite">Tap Listen to hear the word.</p>
+      <button id="stageNext" class="btn primary wide">${mission.stageIndex + 1 === mission.focusIds.length ? "Start listening game" : "Next word"}</button>`;
+    $("listenMount").append(audioButton(item));
+    $("stageNext").addEventListener("click", () => advanceWithinStage("recognise"));
   }
 
   function choicesFor(answer) {
     return shuffle([answer, ...shuffle(items.filter((item) => item.id !== answer.id)).slice(0, 3)]);
   }
 
-  function recordAttempt(item, correct, responseNumber) {
-    const metrics = state.questionMetrics;
-    metrics.responses += 1;
-    if (responseNumber === 1) metrics.attempted += 1;
-    if (correct) {
-      metrics.completed += 1;
-      if (responseNumber === 1) metrics.firstCorrect += 1;
-    }
-    state.quizAttempts += 1;
-    state.itemStats[item.id].attempts += 1;
-    if (correct) {
-      state.correctAnswers += 1;
-      state.itemStats[item.id].correct += 1;
-    }
-  }
-
-  function startMission() {
-    ensureToday();
-    mission = { order: shuffle(items.map((_, index) => index)), step: 0, tries: 0, answered: false };
-    show("mission");
-    renderMissionQuestion();
-  }
-
-  function renderMissionQuestion() {
-    const item = items[mission.order[mission.step]];
-    mission.tries = 0;
-    mission.answered = false;
-    $("missionStep").textContent = `${mission.step + 1} / ${items.length}`;
-    $("missionHint").textContent = item.pinyin;
-    $("missionFeedback").textContent = "";
-    $("missionFeedback").className = "feedback";
-    $("missionNext").classList.add("hidden");
-    $("missionChoices").replaceChildren();
-
-    choicesFor(item).forEach((option) => {
-      const button = document.createElement("button");
-      button.className = "btn choice";
-      button.textContent = option.target;
-      button.addEventListener("click", () => answerMission(button, option.id === item.id, item));
-      $("missionChoices").append(button);
-    });
-    window.setTimeout(() => {
-      if (mission && items[mission.order[mission.step]].id === item.id) speak(item.target, $("missionFeedback"));
-    }, 180);
-  }
-
-  function answerMission(button, isCorrect, item) {
-    if (!mission || mission.answered || button.disabled) return;
-    ensureToday();
-    mission.tries += 1;
-    recordAttempt(item, isCorrect, mission.tries);
-
-    if (!isCorrect) {
-      button.disabled = true;
-      button.classList.add("wrong");
-      $("missionFeedback").textContent = "Try again — listen carefully!";
-      $("missionFeedback").className = "feedback bad";
-      save();
-      speak(item.target, $("missionFeedback"));
-      return;
-    }
-
-    mission.answered = true;
-    button.classList.add("correct");
-    $("missionChoices").querySelectorAll("button").forEach((choice) => { choice.disabled = true; });
-    if (!state.daily.itemIds.includes(item.id)) state.daily.itemIds.push(item.id);
-
-    let rewardText = "Correct!";
-    if (!state.daily.rewardedMissionItems.includes(item.id)) {
-      state.daily.rewardedMissionItems.push(item.id);
-      const firstTry = mission.tries === 1;
-      state.coins += firstTry ? 3 : 1;
-      if (firstTry) state.stars += 1;
-      rewardText = firstTry ? "Correct! +3 coins and +1 star" : "Correct! +1 coin";
+  function renderQuestion(host, mission, mode) {
+    const item = itemById(mission.focusIds[mission.stageIndex]);
+    const isRecall = mode === "recall";
+    host.innerHTML = `${stageHeader(isRecall ? "Recall" : "Listen & recognise", mission.stageIndex, mission.focusIds.length)}
+      <div class="question-prompt">${isRecall ? `<div class="pinyin big">${escapeHtml(item.pinyin)}</div><div class="meaning">${escapeHtml(item.meaning)}</div>` : `<h2>What did you hear?</h2><div id="listenMount" class="center"></div>`}</div>
+      <p id="audioStatus" class="audio-status" aria-live="polite">${isRecall ? "Choose the matching Chinese." : "Tap Listen, then choose."}</p>
+      <div id="choiceGrid" class="choices"></div><div id="questionFeedback" class="feedback" aria-live="polite"></div>
+      <button id="questionNext" class="btn primary wide hidden">Next</button>`;
+    if (!isRecall) $("listenMount").append(audioButton(item));
+    if (mission.stageAnswered) {
+      $("questionFeedback").textContent = "Great work!";
+      $("questionFeedback").className = "feedback good";
+      $("questionNext").classList.remove("hidden");
     } else {
-      rewardText = "Correct! You already earned today's reward for this item.";
+      for (const option of choicesFor(item)) {
+        const button = document.createElement("button");
+        button.className = "choice";
+        button.textContent = option.target;
+        button.addEventListener("click", () => answerQuestion(button, option.id === item.id, item, mode));
+        $("choiceGrid").append(button);
+      }
     }
-    $("missionFeedback").textContent = rewardText;
-    $("missionFeedback").className = "feedback good";
-    $("missionNext").textContent = mission.step === items.length - 1 ? "Finish mission" : "Next";
-    $("missionNext").classList.remove("hidden");
-    save();
+    $("questionNext").addEventListener("click", () => advanceWithinStage(isRecall ? "reward" : "write"));
   }
 
-  function updateDailyStreak() {
-    const today = dateKey();
-    state.streak = window.ProgressLogic.nextStreak(state.lastSessionDate, today, state.streak);
-    state.lastSessionDate = today;
-  }
-
-  function finishMission() {
-    ensureToday();
-    state.sessionsCompleted += 1;
-    if (!state.daily.completed) {
-      state.daily.completed = true;
-      state.coins += 10;
-      state.stars += 5;
-      updateDailyStreak();
-      state.badges.push(BADGES[state.badges.length % BADGES.length]);
-    }
-    mission = null;
-    save();
-    show("rewards");
-  }
-
-  function startRecall() {
-    recall = { order: shuffle(items.map((_, index) => index)).slice(0, 5), step: 0, tries: 0, answered: false };
-    $("recallNext").onclick = nextRecall;
-    renderRecallQuestion();
-  }
-
-  function renderRecallQuestion() {
-    const item = items[recall.order[recall.step]];
-    recall.tries = 0;
-    recall.answered = false;
-    $("recallPrompt").innerHTML = `<div class="pill">${recall.step + 1} / ${recall.order.length}</div><div class="prompt-main">${item.pinyin}</div><div>${item.meaning}</div><button class="speaker" aria-label="Hear the answer">🔊</button>`;
-    $("recallPrompt").querySelector("button").addEventListener("click", () => speak(item.target, $("recallFeedback")));
-    $("recallFeedback").textContent = "Choose the matching Chinese.";
-    $("recallFeedback").className = "feedback";
-    $("recallNext").classList.add("hidden");
-    $("recallChoices").replaceChildren();
-    choicesFor(item).forEach((option) => {
-      const button = document.createElement("button");
-      button.className = "btn choice";
-      button.textContent = option.target;
-      button.addEventListener("click", () => answerRecall(button, option.id === item.id, item));
-      $("recallChoices").append(button);
-    });
-  }
-
-  function answerRecall(button, isCorrect, item) {
-    if (!recall || recall.answered || button.disabled) return;
-    recall.tries += 1;
-    recordAttempt(item, isCorrect, recall.tries);
-    if (!isCorrect) {
+  function answerQuestion(button, correct, item, mode) {
+    const mission = ensureMission();
+    if (mission.stageAnswered || button.disabled) return;
+    mission.questionTries += 1;
+    globalThis.ProgressStore.recordQuestion(store.state, item.id, correct, mission.questionTries, today);
+    if (!correct) {
       button.disabled = true;
       button.classList.add("wrong");
-      $("recallFeedback").textContent = "Not this one — try again.";
-      $("recallFeedback").className = "feedback bad";
+      $("questionFeedback").textContent = "Try again. You can do it!";
+      $("questionFeedback").className = "feedback bad";
       save();
       return;
     }
-    recall.answered = true;
+    mission.stageAnswered = true;
     button.classList.add("correct");
-    $("recallChoices").querySelectorAll("button").forEach((choice) => { choice.disabled = true; });
-    $("recallFeedback").textContent = recall.tries === 1 ? "Great recall!" : "Correct!";
-    $("recallFeedback").className = "feedback good";
-    $("recallNext").textContent = recall.step === recall.order.length - 1 ? "Finish" : "Next";
-    $("recallNext").classList.remove("hidden");
+    $("choiceGrid").querySelectorAll("button").forEach((choice) => { choice.disabled = true; });
+    const resultList = mode === "recall" ? mission.recalledIds : mission.recognisedIds;
+    if (!resultList.includes(item.id)) resultList.push(item.id);
+    let message = "Correct!";
+    if (mode === "recognise" && !store.state.daily.rewardedMissionItems.includes(item.id)) {
+      const reward = mission.questionTries === 1 ? 3 : 1;
+      store.state.daily.rewardedMissionItems.push(item.id);
+      if (!store.state.daily.itemIds.includes(item.id)) store.state.daily.itemIds.push(item.id);
+      if (!mission.rewardedItemIds.includes(item.id)) mission.rewardedItemIds.push(item.id);
+      store.state.coins += reward;
+      mission.coinsEarned += reward;
+      message = `Correct! +${reward} coin${reward === 1 ? "" : "s"}`;
+    }
+    $("questionFeedback").textContent = message;
+    $("questionFeedback").className = "feedback good";
+    $("questionNext").classList.remove("hidden");
     save();
   }
 
-  function nextRecall() {
-    if (recall.step < recall.order.length - 1) {
-      recall.step += 1;
-      renderRecallQuestion();
-    } else {
-      $("recallPrompt").innerHTML = `<div class="reward">🐼 ⭐</div><div class="prompt-main">Challenge complete!</div>`;
-      $("recallChoices").replaceChildren();
-      $("recallFeedback").textContent = "Nice remembering!";
-      $("recallNext").textContent = "Try again";
-      $("recallNext").classList.remove("hidden");
-      $("recallNext").onclick = () => { $("recallNext").onclick = nextRecall; startRecall(); };
-    }
+  function disposeWriter() {
+    writing.observer?.disconnect();
+    writing.observer = null;
+    if (writing.resizeListener) window.removeEventListener("resize", writing.resizeListener);
+    writing.resizeListener = null;
+    writing.writer = null;
   }
 
-  function renderCharacterTabs() {
-    const item = items[writing.itemIndex];
-    $("characterTabs").replaceChildren();
-    [...item.target].forEach((character, index) => {
-      const button = document.createElement("button");
-      const key = `${item.id}:${index}`;
-      button.className = `char-tab${index === writing.charIndex ? " active" : ""}${writing.completed.has(key) ? " done" : ""}`;
-      button.textContent = character;
-      button.setAttribute("aria-label", `Practise ${character}`);
-      button.addEventListener("click", () => { writing.charIndex = index; renderWriting(); });
-      $("characterTabs").append(button);
-    });
+  function writerSize() {
+    const stage = $("writingStage");
+    return Math.max(220, Math.floor(stage?.getBoundingClientRect().width || 320));
   }
 
-  function localCharacterLoader(character, onComplete, onError) {
-    fetch(`./character-data/${encodeURIComponent(character)}.json`)
-      .then((response) => {
-        if (!response.ok) throw new Error(`Character data returned ${response.status}`);
+  function resizeWriter() {
+    if (!writing.writer) return;
+    const size = writerSize();
+    writing.writer.updateDimensions({ width: size, height: size });
+  }
+
+  function renderWriting(host, mission) {
+    if (!mission.writingCharacters.length) return setStage("recall");
+    const character = mission.writingCharacters[mission.stageIndex];
+    host.innerHTML = `${stageHeader("Write", mission.stageIndex, mission.writingCharacters.length)}
+      <div class="write-heading"><div><h2>Write <span class="hanzi-inline">${escapeHtml(character)}</span></h2><p>Follow the stroke order.</p></div>
+      <button id="showStrokes" class="btn compact">Show strokes</button></div>
+      <div id="writingStage" class="writing-stage"><div id="characterTarget"></div></div>
+      <p id="writingFeedback" class="feedback" aria-live="polite">${mission.stageAnswered ? "Beautiful writing!" : "Tap Start writing when you're ready."}</p>
+      <button id="startWriting" class="btn primary wide ${mission.stageAnswered ? "hidden" : ""}">Start writing</button>
+      <button id="writingNext" class="btn primary wide ${mission.stageAnswered ? "" : "hidden"}">Next</button>`;
+    const size = writerSize();
+    writing.writer = globalThis.HanziWriter.create("characterTarget", character, {
+      width: size, height: size, padding: 14, showOutline: true, showCharacter: false,
+      strokeAnimationSpeed: 0.9, delayBetweenStrokes: 140,
+      charDataLoader: (char) => fetch(`./character-data/${encodeURIComponent(char)}.json`).then((response) => {
+        if (!response.ok) throw new Error(`Missing character data for ${char}`);
         return response.json();
       })
-      .then(onComplete)
-      .catch(onError);
-  }
-
-  function renderWriting() {
-    const item = items[writing.itemIndex];
-    const character = [...item.target][writing.charIndex];
-    $("writeSelect").value = String(writing.itemIndex);
-    $("writeItem").textContent = item.target;
-    $("writeDetail").textContent = `${item.pinyin} · ${item.meaning} · character ${writing.charIndex + 1} of ${[...item.target].length}`;
-    renderCharacterTabs();
-    writing.advanceReady = false;
-    $("startWriting").textContent = "✍️ Start writing";
-    $("writingFeedback").textContent = `Write ${character} in the 米字格.`;
-    $("writingFeedback").className = "feedback";
-
-    if (writing.writer && typeof writing.writer.destroy === "function") writing.writer.destroy();
-    $("characterTarget").replaceChildren();
-    const stage = document.querySelector(".writing-stage");
-    const size = stage.clientWidth;
-    writing.writer = HanziWriter.create("characterTarget", character, {
-      width: size,
-      height: size,
-      padding: 18,
-      showCharacter: false,
-      showOutline: true,
-      strokeColor: "#332f46",
-      outlineColor: "#ddd7e8",
-      drawingColor: "#6956df",
-      drawingWidth: 18,
-      highlightColor: "#f0a51a",
-      strokeAnimationSpeed: 1,
-      delayBetweenStrokes: 280,
-      charDataLoader: localCharacterLoader,
-      onLoadCharDataError: () => { $("writingFeedback").textContent = "This character could not load. Check the app files and try again."; $("writingFeedback").className = "feedback bad"; }
     });
-  }
-
-  // Resize the existing writer so a rotation preserves quiz strokes and callbacks.
-  function resizeWriter() {
-    const size = document.querySelector(".writing-stage").clientWidth;
-    if (writing.writer && size > 0) {
-      writing.writer.updateDimensions({ width: size, height: size, padding: 18 });
+    if ("ResizeObserver" in globalThis) {
+      writing.observer = new ResizeObserver(() => window.requestAnimationFrame(resizeWriter));
+      writing.observer.observe($("writingStage"));
+    } else {
+      writing.resizeListener = resizeWriter;
+      window.addEventListener("resize", writing.resizeListener);
     }
-  }
-  if ("ResizeObserver" in window) {
-    new ResizeObserver(resizeWriter).observe(document.querySelector(".writing-stage"));
-  } else {
-    window.addEventListener("resize", resizeWriter);
+    $("showStrokes").addEventListener("click", () => writing.writer?.animateCharacter());
+    $("startWriting").addEventListener("click", startWritingQuiz);
+    $("writingNext").addEventListener("click", () => advanceWithinStage("recall"));
   }
 
   function startWritingQuiz() {
-    if (writing.advanceReady) {
-      writing.charIndex += 1;
-      renderWriting();
-      return;
-    }
-    if (!writing.writer) return;
-    $("writingFeedback").textContent = "Start with the first stroke. You can use a finger or S Pen.";
-    $("writingFeedback").className = "feedback";
+    const mission = ensureMission();
+    if (!writing.writer || mission.stageAnswered) return;
+    $("startWriting").disabled = true;
+    $("writingFeedback").textContent = "Write the character in the square.";
     writing.writer.quiz({
       showHintAfterMisses: 3,
-      highlightOnComplete: true,
-      onMistake: (data) => {
-        $("writingFeedback").textContent = data.totalMistakes >= 3 ? "Here's a hint — follow the highlighted stroke." : "Almost! Try that stroke again.";
-        $("writingFeedback").className = "feedback bad";
+      onMistake: () => {
+        mission.currentHints += 1;
+        $("writingFeedback").textContent = mission.currentHints >= 3 ? "Here's the next stroke. Follow it, then keep going." : "Try that stroke again.";
+        save();
       },
-      onComplete: completeWritingCharacter
+      onComplete: () => {
+        const character = mission.writingCharacters[mission.stageIndex];
+        if (!mission.rewardedWritingCharacters.includes(character)) {
+          mission.rewardedWritingCharacters.push(character);
+          const related = mission.focusIds.filter((id) => [...itemById(id).target].includes(character));
+          globalThis.ProgressStore.completeWriting(store.state, character, related, mission.currentHints, today);
+          store.state.coins += 1;
+          mission.coinsEarned += 1;
+        }
+        mission.stageAnswered = true;
+        $("writingFeedback").textContent = "Beautiful writing! +1 coin";
+        $("writingFeedback").className = "feedback good";
+        $("startWriting").classList.add("hidden");
+        $("writingNext").classList.remove("hidden");
+        save();
+      }
     });
   }
 
-  function completeWritingCharacter() {
-    const item = items[writing.itemIndex];
-    const key = `${item.id}:${writing.charIndex}`;
-    const firstThisSession = !writing.completed.has(key);
-    writing.completed.add(key);
-    state.writingRepetitions += 1;
-    state.itemStats[item.id].writes += 1;
-    if (!state.itemStats[item.id].written.includes(writing.charIndex)) state.itemStats[item.id].written.push(writing.charIndex);
-    if (firstThisSession) state.coins += 1;
+  function claimMissionReward(mission) {
+    if (mission.rewardClaimed) return;
+    mission.rewardClaimed = true;
+    mission.completed = true;
+    if (!store.state.daily.completed) {
+      store.state.daily.completed = true;
+      store.state.coins += 10;
+      mission.coinsEarned += 10;
+      store.state.sessionsCompleted += 1;
+      store.state.streak = globalThis.ProgressLogic.nextStreak(store.state.lastSessionDate, today, store.state.streak);
+      store.state.lastSessionDate = today;
+    }
+    const coverage = store.state.selectionCoverage[set.id] ||= { coveredItemIds: [] };
+    coverage.coveredItemIds = [...new Set([...coverage.coveredItemIds, ...mission.focusIds])];
     save();
-    renderCharacterTabs();
+  }
 
-    const hasNext = writing.charIndex < [...item.target].length - 1;
-    $("writingFeedback").textContent = firstThisSession ? `Beautiful! +1 coin${hasNext ? " — ready for the next character." : " — item complete!"}` : "Great repetition! This character's session coin was already collected.";
-    $("writingFeedback").className = "feedback good";
-    writing.advanceReady = hasNext;
-    $("startWriting").textContent = hasNext ? "Next character →" : "✍️ Practise again";
+  function renderReward(host, mission) {
+    claimMissionReward(mission);
+    host.innerHTML = `${stageHeader("Reward", 0, 0)}
+      <div class="reward-scene"><img src="./tiger/assets/tiger-placeholder.svg" class="tiger reward-tiger" alt="Happy tiger"><div class="coin-burst">+${mission.coinsEarned} 🪙</div></div>
+      <h2 class="center">Mission complete!</h2><p class="center">You practised ${mission.focusIds.length} spelling items and ${mission.writingCharacters.length} writing characters.</p>
+      <div class="reward-actions"><button id="rewardHouse" class="btn primary">Visit Tiger House</button><button id="rewardHome" class="btn">Back home</button></div>`;
+    $("rewardHouse").addEventListener("click", () => show("house"));
+    $("rewardHome").addEventListener("click", () => show("home"));
+  }
+
+  function renderHouse() {
+    renderHeader();
+    const room = $("roomSlots");
+    room.replaceChildren();
+    for (const slot of ["picture", "lamp", "plant", "bed", "pillow", "rug", "basket", "accessory"]) {
+      const itemId = store.state.tigerHouse.slots[slot];
+      const item = globalThis.TigerHouse.catalogue.find((entry) => entry.id === itemId);
+      const marker = document.createElement("div");
+      marker.className = `room-slot slot-${slot}`;
+      marker.dataset.slot = slot;
+      marker.textContent = item?.placeholder || "";
+      marker.setAttribute("aria-label", item ? `${item.name} equipped` : `${slot} slot empty`);
+      room.append(marker);
+    }
+    const catalogue = $("shopCatalogue");
+    catalogue.replaceChildren();
+    for (const item of globalThis.TigerHouse.catalogue) {
+      const owned = store.state.tigerHouse.owned.includes(item.id);
+      const equipped = store.state.tigerHouse.slots[item.slot] === item.id;
+      const card = document.createElement("article");
+      card.className = "shop-item";
+      card.innerHTML = `<div class="shop-icon">${item.placeholder}</div><div><b>${escapeHtml(item.name)}</b><span>${item.price} coins</span></div><button class="btn compact">${equipped ? "Placed" : owned ? "Place" : "Buy"}</button>`;
+      const button = card.querySelector("button");
+      button.disabled = equipped;
+      button.addEventListener("click", () => owned ? equipItem(item.id) : buyItem(item.id));
+      catalogue.append(card);
+    }
+    $("houseMessage").textContent = "Choose cosy things for Tiger's room.";
+  }
+
+  function buyItem(itemId) {
+    if (purchaseLocks.has(itemId)) return;
+    purchaseLocks.add(itemId);
+    const result = globalThis.TigerHouse.purchase(store.state, itemId);
+    purchaseLocks.delete(itemId);
+    if (!result.ok) {
+      $("houseMessage").textContent = result.reason === "insufficient-coins" ? "Save a few more coins for that item." : "You already own that item.";
+      return;
+    }
+    globalThis.TigerHouse.equip(store.state, itemId);
+    save();
+    renderHouse();
+    $("houseMessage").textContent = `${result.item.name} is now in Tiger's room!`;
+  }
+
+  function equipItem(itemId) {
+    const result = globalThis.TigerHouse.equip(store.state, itemId);
+    if (result.ok) save();
+    renderHouse();
+    $("houseMessage").textContent = result.ok ? `${result.item.name} is placed.` : "That item is not available.";
   }
 
   function masteryFor(item) {
-    const stats = state.itemStats[item.id];
-    if (!stats.attempts && !stats.writes) return 0;
-    const accuracy = stats.attempts ? stats.correct / stats.attempts : 0;
-    const writingCoverage = stats.written.length / [...item.target].length;
-    return Math.round(accuracy * 60 + writingCoverage * 40);
+    const stats = store.state.itemStats[item.id];
+    const r = stats.recognition;
+    if (!r.questionsAttempted) return 0;
+    const accuracy = r.firstCorrect / r.questionsAttempted;
+    return Math.round(Math.min(100, accuracy * 75 + Math.min(25, stats.writing.successfulRepetitions * 8)));
   }
 
   function renderParent() {
-    const tracked = state.questionMetrics;
-    const accuracy = tracked.attempted ? Math.round(tracked.firstCorrect / tracked.attempted * 100) : 0;
-    const completion = tracked.attempted ? Math.round(tracked.completed / tracked.attempted * 100) : 0;
-    const metrics = [
-      ["Questions attempted", tracked.attempted],
-      ["Answer responses (clicks)", tracked.responses],
-      ["Correct on first attempt", tracked.firstCorrect],
-      ["First-attempt accuracy", `${accuracy}%`],
-      ["Questions completed", `${tracked.completed} / ${tracked.attempted}`],
-      ["Overall question completion", `${completion}%`],
-      ["Writing successes", state.writingRepetitions],
-      ["Sessions finished", state.sessionsCompleted],
-      ["Current streak", `${state.streak} day${state.streak === 1 ? "" : "s"}`]
-    ];
-    $("parentMetrics").innerHTML = metrics.map(([label, value]) => `<div class="metric"><b>${value}</b><span class="sub">${label}</span></div>`).join("");
-
-    const weak = items.filter((item) => {
-      const stats = state.itemStats[item.id];
-      return stats.attempts >= 2 && stats.correct / stats.attempts < 0.75;
-    });
-    $("weakItems").textContent = weak.length ? weak.map((item) => `${item.target} (${item.pinyin})`).join(", ") : "No weak items identified yet.";
-    $("masteryList").innerHTML = items.map((item) => {
-      const mastery = masteryFor(item);
-      return `<div class="mastery-row"><b>${item.target}</b><div class="mastery-track"><div class="mastery-fill" style="width:${mastery}%"></div></div><span>${mastery}%</span></div>`;
+    const metrics = store.state.questionMetrics;
+    const accuracy = metrics.attempted ? Math.round(metrics.firstCorrect / metrics.attempted * 100) : 0;
+    const completion = metrics.attempted ? Math.round(metrics.completed / metrics.attempted * 100) : 0;
+    $("parentSummary").innerHTML = `
+      <div class="metric"><span>Active set</span><b>${escapeHtml(set.label)}</b></div><div class="metric"><span>MOE mapping</span><b>P1${lesson.volume} · Lesson ${lesson.lesson}</b></div>
+      <div class="metric"><span>Sessions</span><b>${store.state.sessionsCompleted}</b></div><div class="metric"><span>Current streak</span><b>${store.state.streak} days</b></div>
+      <div class="metric"><span>Questions attempted</span><b>${metrics.attempted}</b></div><div class="metric"><span>Answer responses</span><b>${metrics.responses}</b></div>
+      <div class="metric"><span>Correct first try</span><b>${accuracy}%</b></div><div class="metric"><span>Question completion</span><b>${completion}%</b></div>
+      <div class="metric"><span>Writing repetitions</span><b>${store.state.writingRepetitions}</b></div>`;
+    const weak = items.filter((item) => globalThis.MissionPlanner.isWeakItem(store.state.itemStats[item.id]));
+    $("weakItems").textContent = weak.length ? weak.map((item) => item.target).join("、") : "No weak items yet.";
+    $("itemMastery").innerHTML = items.map((item) => `<div class="mastery-row"><b>${escapeHtml(item.target)}</b><div class="mastery-track"><i style="width:${masteryFor(item)}%"></i></div><span>${masteryFor(item)}%</span></div>`).join("");
+    $("characterMastery").innerHTML = lesson.writing.map((character) => {
+      const stats = store.state.characterStats[character] || {};
+      const level = Math.min(100, (stats.successfulRepetitions || 0) * 40 + (stats.legacyCompleted ? 20 : 0));
+      return `<div class="character-chip"><b>${character}</b><span>${stats.successfulRepetitions || 0} writes · ${level}%</span></div>`;
     }).join("");
   }
 
-  $("startMission").addEventListener("click", startMission);
-  $("speakMission").addEventListener("click", () => {
-    if (mission) speak(items[mission.order[mission.step]].target, $("missionFeedback"));
-  });
-  $("missionNext").addEventListener("click", () => {
-    if (!mission || !mission.answered) return;
-    if (mission.step < items.length - 1) { mission.step += 1; renderMissionQuestion(); } else finishMission();
-  });
-  $("recallNext").onclick = nextRecall;
-  $("writeSelect").addEventListener("change", (event) => { writing.itemIndex = Number(event.target.value); writing.charIndex = 0; renderWriting(); });
-  $("animateCharacter").addEventListener("click", () => { if (writing.writer) { writing.writer.animateCharacter(); $("writingFeedback").textContent = "Watch the stroke order, then try it yourself."; } });
-  $("startWriting").addEventListener("click", startWritingQuiz);
+  $("startMission").addEventListener("click", () => show("mission"));
+  $("openHouse").addEventListener("click", () => show("house"));
   $("openParent").addEventListener("click", () => show("parent"));
-  document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => show(button.dataset.go)));
-  document.querySelectorAll("[data-nav]").forEach((button) => button.addEventListener("click", () => show(button.dataset.nav)));
+  document.querySelectorAll("[data-home]").forEach((button) => button.addEventListener("click", () => show("home")));
+  window.addEventListener("orientationchange", () => window.setTimeout(resizeWriter, 120));
+  audio.preload(items);
+  renderHome();
 
-  renderLists();
-  renderStats();
-
+  globalThis.AppDebug = { store, set, lesson, ensureMission, show, resizeWriter, audio };
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch(() => {}));
   }

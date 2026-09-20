@@ -3,108 +3,71 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#6956df">
-  <meta name="description" content="Five-minute Chinese spelling practice for Corinne.">
+  <meta name="theme-color" content="#d7855f">
+  <meta name="description" content="A five-minute guided Chinese mission for Corinne.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon-192.png">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <link rel="stylesheet" href="./styles.css">
-  <title>Corinne's 中文 Quest</title>
+  <title>Corinne's 中文 Tiger</title>
 </head>
 <body>
 <main class="app">
-  <header class="top">
-    <div><div class="eyebrow">P1 · 听写（十六） · 23 SEPT</div><h1>Corinne's 中文 Quest</h1></div>
-    <div class="stats" aria-label="Current rewards">
-      <span class="stat">🪙 <b id="coins">0</b></span>
-      <span class="stat">⭐ <b id="stars">0</b></span>
-      <span class="stat">🔥 <b id="streak">0</b></span>
-    </div>
+  <header class="topbar">
+    <button class="brand" data-home aria-label="Go home"><span>中文</span> Tiger</button>
+    <div class="coin-balance" aria-label="Coin balance">🪙 <b id="coinCount">0</b></div>
   </header>
 
   <section id="home" class="screen active">
-    <div class="card hero">
-      <div class="pet" aria-label="BaoBao the panda">🐼</div>
-      <div>
-        <div class="mission-label">TODAY'S 5-MINUTE MISSION</div>
-        <h2>Master 7 spelling items</h2>
-        <div class="progress"><div id="fill" class="fill"></div></div>
-        <div class="progress-row"><span id="progressText" class="sub">0 / 7 complete</span><span id="rewardStatus" class="sub">🎁 +10 coins, +5 stars</span></div>
+    <div class="home-hero">
+      <div class="sun-shape" aria-hidden="true"></div>
+      <img src="./tiger/assets/tiger-placeholder.svg" class="tiger home-tiger" alt="A friendly orange tiger mascot">
+      <div class="home-copy">
+        <span class="eyebrow">TODAY'S MISSION</span>
+        <h1>Ready to practise?</h1>
+        <p id="missionSummary">About 5 minutes of Chinese practice</p>
+        <div class="progress" aria-label="Mission progress"><div id="homeProgress"></div></div>
+        <p id="homeProgressText" class="progress-text">0% of today's mission</p>
+        <button id="startMission" class="btn primary mission-button">Start today's mission</button>
       </div>
     </div>
-    <div class="grid">
-      <button class="btn primary" id="startMission">🎯 Start today's mission</button>
-      <button class="btn" data-go="learn">👀 See &amp; hear</button>
-      <button class="btn" data-go="write">✍️ Writing practice</button>
-      <button class="btn" data-go="recall">💡 Recall challenge</button>
-    </div>
-    <div class="card"><h3>This week's list</h3><div id="homeList"></div></div>
+    <button id="openHouse" class="house-entry"><span class="house-icon">⌂</span><span><b>Tiger House</b><small>Use your coins to make it cosy</small></span><span aria-hidden="true">›</span></button>
     <button id="openParent" class="parent-link">For grown-ups</button>
   </section>
 
   <section id="mission" class="screen">
-    <div class="card">
-      <div class="pill" id="missionStep">1 / 7</div>
-      <div class="prompt"><h2>What did you hear?</h2><button id="speakMission" class="speaker" style="font-size:2rem;width:82px;height:82px" aria-label="Play Mandarin">🔊</button><div id="missionHint" class="sub"></div></div>
-      <div id="missionChoices" class="choices"></div>
-      <div id="missionFeedback" class="feedback" aria-live="polite"></div>
-      <button id="missionNext" class="btn primary hidden" style="width:100%">Next</button>
-    </div>
+    <button class="back-link" data-home>‹ Home</button>
+    <div id="missionCard" class="card mission-card"></div>
   </section>
 
-  <section id="learn" class="screen"><div class="card"><div class="section-head"><h2>See &amp; hear</h2><span>👀 🔊</span></div><p class="sub">Look at each spelling item, then tap the speaker.</p><div id="learnList"></div></div></section>
-
-  <section id="write" class="screen">
-    <div class="card">
-      <div class="section-head"><h2>Writing practice</h2><span>✍️</span></div>
-      <p class="sub">Choose an item, then write each character in stroke order.</p>
-      <select id="writeSelect" class="item-picker" aria-label="Choose a spelling item"></select>
-      <div id="characterTabs" class="character-tabs" aria-label="Characters in this item"></div>
-      <div class="prompt"><div id="writeItem" class="zh"></div><div id="writeDetail" class="sub"></div></div>
-      <div class="writing-stage"><div id="characterTarget" aria-label="Chinese character writing area"></div></div>
-      <p id="writingFeedback" class="feedback" aria-live="polite">Tap “Start writing”, then follow the stroke order.</p>
-      <div class="writing-controls">
-        <button id="animateCharacter" class="btn">▶ Show strokes</button>
-        <button id="startWriting" class="btn primary">✍️ Start writing</button>
-      </div>
-      <p class="write-help">After 3 misses, BaoBao will show the next stroke.</p>
+  <section id="house" class="screen">
+    <div class="section-heading"><button class="back-link" data-home>‹ Home</button><h1>Tiger House</h1><span></span></div>
+    <p id="houseMessage" class="center muted" aria-live="polite">Choose cosy things for Tiger's room.</p>
+    <div class="tiger-room">
+      <div id="roomSlots" class="room-slots"></div>
+      <img src="./tiger/assets/tiger-placeholder.svg" class="tiger room-tiger" alt="Tiger in a cosy room">
     </div>
-  </section>
-
-  <section id="recall" class="screen">
-    <div class="card">
-      <div class="section-head"><h2>Recall challenge</h2><span>💡</span></div>
-      <div id="recallPrompt" class="prompt"></div>
-      <div id="recallChoices" class="choices"></div>
-      <div id="recallFeedback" class="feedback" aria-live="polite"></div>
-      <button id="recallNext" class="btn primary hidden" style="width:100%">Next</button>
-    </div>
-  </section>
-
-  <section id="rewards" class="screen">
-    <div class="card" style="text-align:center"><div class="reward">🐼 🎁</div><h2>BaoBao's Treasure Shelf</h2><p>Coins: <b id="rewardCoins">0</b> · Stars: <b id="rewardStars">0</b></p><div id="badges" class="badge-shelf"></div><button class="btn primary" data-go="home">Back home</button></div>
+    <h2 class="shop-title">Cosy shop</h2>
+    <div id="shopCatalogue" class="shop-catalogue"></div>
   </section>
 
   <section id="parent" class="screen">
+    <div class="section-heading"><button class="back-link" data-home>‹ Home</button><h1>Grown-up view</h1><span></span></div>
     <div class="card">
-      <div class="section-head"><h2>Parent view</h2><button class="btn small-btn" data-go="home">Close</button></div>
-      <p class="sub">Progress is stored only on this device.</p>
-      <p class="sub">Question metrics count mission and recall questions from this update onward. A question starts with its first answer and completes when answered correctly, including retries.</p>
-      <div id="parentMetrics" class="metrics"></div>
-      <h3>Items to practise</h3><p id="weakItems">No weak items yet.</p>
-      <h3>Mastery by spelling item</h3><div id="masteryList"></div>
+      <p class="muted">Progress stays on this device. Existing overall question metrics are preserved when present. V0.1 item-level answer taps remain as legacy history because they cannot reconstruct per-item first-attempt results.</p>
+      <div id="parentSummary" class="metrics"></div>
+      <h2>Weak items</h2><p id="weakItems">No weak items yet.</p>
+      <h2>Spelling item mastery</h2><div id="itemMastery"></div>
+      <h2>Lesson 16 writing</h2><div id="characterMastery" class="character-mastery"></div>
     </div>
   </section>
-
-  <nav class="nav" aria-label="Main navigation">
-    <button data-nav="home" class="active">🏠<br>Home</button>
-    <button data-nav="learn">👀<br>Learn</button>
-    <button data-nav="write">✍️<br>Write</button>
-    <button data-nav="rewards">🎁<br>Rewards</button>
-  </nav>
 </main>
-<script src="./curriculum.js"></script>
+<script src="./curriculum/moe-p1-standard.js"></script>
+<script src="./curriculum/tingxie.js"></script>
+<script src="./mission.js"></script>
+<script src="./shop/tiger-house.js"></script>
 <script src="./progress.js"></script>
+<script src="./audio.js"></script>
 <script src="./vendor/hanzi-writer.min.js"></script>
 <script src="./app.js"></script>
 </body>
