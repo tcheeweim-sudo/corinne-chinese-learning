@@ -1,13 +1,13 @@
 globalThis.TigerHouse = (() => {
   const catalogue = [
-    { id: "cloud-pillow", name: "Cloud Pillow", price: 20, slot: "pillow", placeholder: "☁️" },
-    { id: "peach-rug", name: "Peach Rug", price: 30, slot: "rug", placeholder: "🟠" },
-    { id: "warm-lamp", name: "Warm Lamp", price: 40, slot: "lamp", placeholder: "💡" },
-    { id: "little-plant", name: "Little Plant", price: 50, slot: "plant", placeholder: "🪴" },
-    { id: "tiger-picture", name: "Tiger Picture", price: 60, slot: "picture", placeholder: "🖼️" },
-    { id: "toy-basket", name: "Toy Basket", price: 75, slot: "basket", placeholder: "🧺" },
-    { id: "cosy-bed", name: "Cosy Bed", price: 90, slot: "bed", placeholder: "🛏️" },
-    { id: "peach-ribbon", name: "Peach Ribbon", price: 120, slot: "accessory", placeholder: "🎀" }
+    { id: "cloud-pillow", name: "Cloud Pillow", price: 20, slot: "pillow", image: null, placeholder: "☁️" },
+    { id: "peach-rug", name: "Peach Rug", price: 30, slot: "rug", image: null, placeholder: "🟠" },
+    { id: "warm-lamp", name: "Warm Lamp", price: 40, slot: "lamp", image: null, placeholder: "💡" },
+    { id: "little-plant", name: "Little Plant", price: 50, slot: "plant", image: null, placeholder: "🪴" },
+    { id: "tiger-picture", name: "Tiger Picture", price: 60, slot: "picture", image: null, placeholder: "🖼️" },
+    { id: "toy-basket", name: "Toy Basket", price: 75, slot: "basket", image: null, placeholder: "🧺" },
+    { id: "cosy-bed", name: "Cosy Bed", price: 90, slot: "bed", image: null, placeholder: "🛏️" },
+    { id: "peach-ribbon", name: "Peach Ribbon", price: 120, slot: "accessory", image: null, placeholder: "🎀" }
   ];
 
   function freshHouse() { return { owned: [], slots: {}, purchases: [] }; }

@@ -165,6 +165,15 @@
     item.lastPractised = today;
   }
 
+  function rolloverDay(state, today = dateKey()) {
+    if (state.daily.date === today && (!state.mission || state.mission.date === today)) return false;
+    state.legacyDaily = state.daily;
+    state.daily = { date: today, itemIds: [], rewardedMissionItems: [], completed: false };
+    state.mission = null;
+    // Keep the last completed streak and its date; display/next completion derives its current value.
+    return true;
+  }
+
   function completeWriting(state, character, itemIds, hints, today = dateKey()) {
     state.characterStats[character] ||= { successfulRepetitions: 0, hints: 0, lastPractised: "", legacyCompleted: false };
     const charStats = state.characterStats[character];
@@ -189,5 +198,5 @@
   }
 
   globalThis.ProgressLogic = ProgressLogic;
-  globalThis.ProgressStore = { STORAGE_KEY, STATE_VERSION, dateKey, freshState, migrateState, recordQuestion, completeWriting, createStore };
+  globalThis.ProgressStore = { STORAGE_KEY, STATE_VERSION, dateKey, freshState, migrateState, recordQuestion, completeWriting, createStore, rolloverDay };
 })();

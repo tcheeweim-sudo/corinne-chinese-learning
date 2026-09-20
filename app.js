@@ -6,7 +6,7 @@
   const lesson = globalThis.getMoeLesson(set.lessonId);
   const items = set.items;
   const itemById = (id) => items.find((item) => item.id === id);
-  const today = globalThis.ProgressStore.dateKey();
+  let today = globalThis.ProgressStore.dateKey();
   const store = globalThis.ProgressStore.createStore({ items, set, today });
   const audio = new globalThis.CurriculumAudio();
   const stages = ["intro", "see", "recognise", "write", "recall", "reward"];
@@ -28,7 +28,25 @@
     renderHeader();
   }
 
+  function refreshDay() {
+    today = globalThis.ProgressStore.dateKey();
+    const changed = globalThis.ProgressStore.rolloverDay(store.state, today);
+    if (changed) {
+      audio.stop();
+      disposeWriter();
+      store.save();
+    }
+    return changed;
+  }
+
+  function rejectExpiredAction() {
+    if (!refreshDay()) return false;
+    show("home");
+    return true;
+  }
+
   function ensureMission() {
+    refreshDay();
     if (!store.state.mission) {
       store.state.mission = globalThis.MissionPlanner.createMission(set, lesson, store.state, today);
       save();
@@ -37,6 +55,7 @@
   }
 
   function show(screenId) {
+    refreshDay();
     disposeWriter();
     document.querySelectorAll(".screen").forEach((screen) => screen.classList.toggle("active", screen.id === screenId));
     if (screenId === "home") renderHome();
@@ -61,12 +80,13 @@
     const percent = missionPercent(mission);
     $("homeProgress").style.width = `${percent}%`;
     $("homeProgressText").textContent = mission?.rewardClaimed ? "Mission complete!" : `${percent}% of today's mission`;
-    $("missionSummary").textContent = `Up to 4 focus items · up to 4 writing characters · about 5 minutes`;
+    $("missionSummary").textContent = `Up to ${MissionPlanner.limits.focus} focus items · up to ${MissionPlanner.limits.writing} writing characters · about 5 minutes`;
     $("startMission").textContent = mission ? (mission.rewardClaimed ? "See today's reward" : "Continue mission") : "Start today's mission";
     renderHeader();
   }
 
   function setStage(stage) {
+    if (rejectExpiredAction()) return;
     const mission = ensureMission();
     mission.stage = stage;
     mission.stageIndex = 0;
@@ -78,6 +98,7 @@
   }
 
   function advanceWithinStage(nextStage) {
+    if (rejectExpiredAction()) return;
     const mission = ensureMission();
     mission.stageIndex += 1;
     mission.questionTries = 0;
@@ -175,6 +196,7 @@
   }
 
   function answerQuestion(button, correct, item, mode) {
+    if (rejectExpiredAction()) return;
     const mission = ensureMission();
     if (mission.stageAnswered || button.disabled) return;
     mission.questionTries += 1;
@@ -209,6 +231,7 @@
   }
 
   function disposeWriter() {
+    writing.writer?.cancelQuiz();
     writing.observer?.disconnect();
     writing.observer = null;
     if (writing.resizeListener) window.removeEventListener("resize", writing.resizeListener);
@@ -259,6 +282,7 @@
   }
 
   function startWritingQuiz() {
+    if (rejectExpiredAction()) return;
     const mission = ensureMission();
     if (!writing.writer || mission.stageAnswered) return;
     $("startWriting").disabled = true;
@@ -266,11 +290,13 @@
     writing.writer.quiz({
       showHintAfterMisses: 3,
       onMistake: () => {
+        if (rejectExpiredAction() || store.state.mission !== mission) return;
         mission.currentHints += 1;
         $("writingFeedback").textContent = mission.currentHints >= 3 ? "Here's the next stroke. Follow it, then keep going." : "Try that stroke again.";
         save();
       },
       onComplete: () => {
+        if (rejectExpiredAction() || store.state.mission !== mission) return;
         const character = mission.writingCharacters[mission.stageIndex];
         if (!mission.rewardedWritingCharacters.includes(character)) {
           mission.rewardedWritingCharacters.push(character);
@@ -290,6 +316,7 @@
   }
 
   function claimMissionReward(mission) {
+    if (rejectExpiredAction() || store.state.mission !== mission) return;
     if (mission.rewardClaimed) return;
     mission.rewardClaimed = true;
     mission.completed = true;
@@ -302,7 +329,8 @@
       store.state.lastSessionDate = today;
     }
     const coverage = store.state.selectionCoverage[set.id] ||= { coveredItemIds: [] };
-    coverage.coveredItemIds = [...new Set([...coverage.coveredItemIds, ...mission.focusIds])];
+    const previous = coverage.coveredItemIds.length >= items.length ? [] : coverage.coveredItemIds;
+    coverage.coveredItemIds = [...new Set([...previous, ...mission.focusIds])];
     save();
   }
 
@@ -316,6 +344,17 @@
     $("rewardHome").addEventListener("click", () => show("home"));
   }
 
+  function renderFurniture(host, item) {
+    host.replaceChildren();
+    if (!item) return;
+    if (!item.image) { host.textContent = item.placeholder; return; }
+    const image = document.createElement("img");
+    image.src = item.image;
+    image.alt = item.name;
+    image.addEventListener("error", () => { host.textContent = item.placeholder; }, { once: true });
+    host.append(image);
+  }
+
   function renderHouse() {
     renderHeader();
     const room = $("roomSlots");
@@ -326,7 +365,7 @@
       const marker = document.createElement("div");
       marker.className = `room-slot slot-${slot}`;
       marker.dataset.slot = slot;
-      marker.textContent = item?.placeholder || "";
+      renderFurniture(marker, item);
       marker.setAttribute("aria-label", item ? `${item.name} equipped` : `${slot} slot empty`);
       room.append(marker);
     }
@@ -337,7 +376,8 @@
       const equipped = store.state.tigerHouse.slots[item.slot] === item.id;
       const card = document.createElement("article");
       card.className = "shop-item";
-      card.innerHTML = `<div class="shop-icon">${item.placeholder}</div><div><b>${escapeHtml(item.name)}</b><span>${item.price} coins</span></div><button class="btn compact">${equipped ? "Placed" : owned ? "Place" : "Buy"}</button>`;
+      card.innerHTML = `<div class="shop-icon"></div><div><b>${escapeHtml(item.name)}</b><span>${item.price} coins</span></div><button class="btn compact">${equipped ? "Placed" : owned ? "Place" : "Buy"}</button>`;
+      renderFurniture(card.querySelector(".shop-icon"), item);
       const button = card.querySelector("button");
       button.disabled = equipped;
       button.addEventListener("click", () => owned ? equipItem(item.id) : buyItem(item.id));
@@ -382,7 +422,7 @@
     const completion = metrics.attempted ? Math.round(metrics.completed / metrics.attempted * 100) : 0;
     $("parentSummary").innerHTML = `
       <div class="metric"><span>Active set</span><b>${escapeHtml(set.label)}</b></div><div class="metric"><span>MOE mapping</span><b>P1${lesson.volume} · Lesson ${lesson.lesson}</b></div>
-      <div class="metric"><span>Sessions</span><b>${store.state.sessionsCompleted}</b></div><div class="metric"><span>Current streak</span><b>${store.state.streak} days</b></div>
+      <div class="metric"><span>Sessions</span><b>${store.state.sessionsCompleted}</b></div><div class="metric"><span>Current streak</span><b>${ProgressLogic.currentStreak(store.state.lastSessionDate, today, store.state.streak)} days</b></div>
       <div class="metric"><span>Questions attempted</span><b>${metrics.attempted}</b></div><div class="metric"><span>Answer responses</span><b>${metrics.responses}</b></div>
       <div class="metric"><span>Correct first try</span><b>${accuracy}%</b></div><div class="metric"><span>Question completion</span><b>${completion}%</b></div>
       <div class="metric"><span>Writing repetitions</span><b>${store.state.writingRepetitions}</b></div>`;
@@ -401,6 +441,10 @@
   $("openParent").addEventListener("click", () => show("parent"));
   document.querySelectorAll("[data-home]").forEach((button) => button.addEventListener("click", () => show("home")));
   window.addEventListener("orientationchange", () => window.setTimeout(resizeWriter, 120));
+  const resume = () => { if (refreshDay()) show("home"); };
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) resume(); });
+  window.addEventListener("pageshow", resume);
+  window.addEventListener("focus", resume);
   audio.preload(items);
   renderHome();
 

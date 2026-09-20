@@ -1,10 +1,11 @@
-importScripts("./curriculum/moe-p1-standard.js", "./curriculum/tingxie.js");
-const CACHE_NAME = "corinne-v0.2.1";
+importScripts("./curriculum/moe-p1-standard.js", "./curriculum/tingxie.js", "./shop/tiger-house.js");
+const CACHE_NAME = "corinne-v0.2.2";
 const APP_SHELL = [
   "./", "./index.html", "./styles.css", "./app.js", "./audio.js", "./mission.js", "./progress.js",
   "./curriculum/moe-p1-standard.js", "./curriculum/tingxie.js", "./shop/tiger-house.js",
   "./tiger/assets/tiger-placeholder.svg", "./manifest.webmanifest", "./vendor/hanzi-writer.min.js",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-512.png",
+  ...globalThis.TigerHouse.catalogue.map((item) => item.image).filter(Boolean),
   ...globalThis.REQUIRED_CHARACTERS.map((character) => `./character-data/${encodeURIComponent(character)}.json`)
 ];
 const OPTIONAL_AUDIO = globalThis.CURRICULUM.map((item) => item.audio).filter(Boolean);

@@ -41,6 +41,7 @@ document.getElementById('run').onclick = async () => {
 
     click('startMission'); click('introNext');
     const focusCount = win.AppDebug.store.state.mission.focusIds.length;
+    assert(focusCount === 3 && win.AppDebug.store.state.mission.writingCharacters.length <= 2, 'Expected 3+2 mission');
     for (let i = 0; i < focusCount; i++) click('stageNext');
     answer(true); click('questionNext');
     const beforeReload = savedState();
@@ -78,6 +79,9 @@ document.getElementById('run').onclick = async () => {
     assert(doc.getElementById('parentSummary').textContent.includes('Answer responses'), 'Parent response metric missing');
     log('PASS: recall, mission reward anti-farming, streak, parent metrics and local reload');
 
+    // Seed shop funds independently of the now-shorter mission reward.
+    win.AppDebug.store.state.coins += 20;
+    win.AppDebug.store.save();
     win.AppDebug.show('house');
     const pillow = [...doc.querySelectorAll('.shop-item')].find(card => card.textContent.includes('Cloud Pillow'));
     pillow.querySelector('button').click();
@@ -88,6 +92,21 @@ document.getElementById('run').onclick = async () => {
     await load(); win = frame.contentWindow;
     assert(win.AppDebug.store.state.tigerHouse.slots.pillow === 'cloud-pillow', 'Tiger House placement did not survive reload');
     log('PASS: Tiger House purchase, duplicate protection and persistence');
+
+    const oldCoins = win.AppDebug.store.state.coins;
+    const originalDateKey = win.ProgressStore.dateKey;
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    const nextDate = originalDateKey(tomorrow);
+    win.ProgressStore.dateKey = () => nextDate;
+    win.dispatchEvent(new Event('pageshow'));
+    assert(win.AppDebug.store.state.mission === null, 'Resume must expire yesterday mission');
+    assert(win.AppDebug.store.state.daily.date === nextDate && !win.AppDebug.store.state.daily.completed, 'Daily claims must reset');
+    assert(win.AppDebug.store.state.coins === oldCoins, 'Rollover lost historical coins');
+    win.AppDebug.show('mission');
+    assert(win.AppDebug.store.state.mission.date === nextDate && win.AppDebug.store.state.mission.stage === 'intro', 'New mission must use refreshed date');
+    win.ProgressStore.dateKey = originalDateKey;
+    win.dispatchEvent(new Event('pageshow'));
+    log('PASS: open-app day rollover, fresh mission and preserved coins');
 
     localStorage.setItem('corinne-zh-v0', JSON.stringify({coins:8,stars:3,badges:['old'],itemStats:{mama:{attempts:4,correct:2,writes:1,written:[0]}}}));
     await load(); win = frame.contentWindow;
@@ -113,7 +132,7 @@ document.getElementById('inspect').onclick = async () => {
     assert(registration?.active, 'No active service worker');
     for (let i = 0; i < 50 && (registration.installing || registration.waiting); i++) await pause(100);
     const names = (await caches.keys()).filter(name => name.startsWith('corinne-v'));
-    assert(names.length === 1 && names[0] === 'corinne-v0.2.1', 'Expected only the current V0.2 cache');
+    assert(names.length === 1 && names[0] === 'corinne-v0.2.2', 'Expected only the current V0.2 cache');
     const cache = await caches.open(names[0]);
     const keys = await cache.keys();
     assert(keys.filter(request => request.url.includes('/character-data/')).length === 19, 'Expected 19 character files');

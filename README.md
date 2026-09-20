@@ -4,7 +4,7 @@ A static, local-first PWA for a roughly five-minute guided Primary 1 Chinese pra
 
 ## V0.2 experience
 
-The child follows one path: Tiger intro → see and hear → listen and recognise → write → recall → reward. A mission selects up to four active 听写 items and four writing characters. It covers unseen active items before ordinary repeats while allowing weak items to recur earlier.
+The child follows one path: Tiger intro → see and hear → listen and recognise → write → recall → reward. A mission selects up to three active 听写 items and two writing characters. It covers unseen active items before ordinary repeats while allowing weak items to recur earlier.
 
 The home screen shows only the tiger, today's mission, one progress indicator, coin balance, one Start/Continue button, and Tiger House. Parent metrics remain behind a small grown-up link.
 
@@ -100,3 +100,18 @@ Parent metrics distinguish questions attempted, answer responses/clicks, correct
 ## Privacy and scope
 
 There is no account, backend, analytics service, advertising, cloud sync, social feature, OCR, AI question generation, premium currency, or real-money purchase. All progress stays in local browser storage.
+
+## Mission limits, recovery and midnight
+
+MissionPlanner.limits in mission.js sets new missions to 3 focus items and at most 2 writing characters. In-progress missions from the earlier 4+4 build retain saved steps and rewards until the next day. Covered weak items may recur early, with at least one slot reserved for unseen items. Ordinary repeats wait until unseen items have been included. Coverage starts a fresh cycle after all seven items.
+
+Writing weakness means at least two recorded difficulties and an average of at least two difficulties per successful repetition. For example, 4 difficulties across 1 repetition is weak; two subsequent clean repetitions reduce the average to 4/3 and remove writing weakness. The existing hints field records stroke mistakes, including those leading to hints; its historical meaning is preserved. Recognition weakness still requires at least two questions with first-attempt accuracy below 70%. An item can remain weak for recognition after writing recovers.
+
+On visibility/resume and before mission actions, the app recalculates the local day. A new day expires the old mission and daily claims, retaining totals, mastery, coverage, purchases and the last completed streak/date. A stale answer or writing callback cannot earn a new-day reward.
+
+## Replaceable visual assets
+
+- Tiger: replace tiger/assets/tiger-placeholder.svg in place to update home, intro, reward and room together. No application logic changes are needed. This remains temporary artwork.
+- Furniture: add approved images under tiger/assets/furniture/ and set each catalogue entry's image in shop/tiger-house.js to a relative URL such as ./tiger/assets/furniture/cloud-pillow.png. A null value uses the emoji placeholder; failed image loads also show that placeholder. The same image renders in the shop and preset room slot. The worker derives image paths from the catalogue and requires configured files for offline installation.
+- PWA icons: replace icons/icon-192.png, icons/icon-512.png and icons/icon-maskable-512.png with matching dimensions. Keep important maskable artwork inside the central safe area. Existing manifest and HTML references need no structural changes.
+- Increment the worker cache version whenever replacing assets. Run validation before deployment; GitHub Pages already stages tiger/ and icons/.
