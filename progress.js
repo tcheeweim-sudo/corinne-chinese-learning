@@ -192,7 +192,7 @@
     return state;
   }
 
-  function recordQuestion(state, itemId, correct, responseNumber, today = dateKey()) {
+  function recordQuestion(state, setId, itemId, correct, responseNumber, today = dateKey()) {
     const item = state.itemStats[itemId];
     if (!item) return;
     state.questionMetrics.responses += 1; item.recognition.responses += 1; state.quizAttempts += 1;
@@ -204,7 +204,7 @@
       state.questionMetrics.completed += 1; item.recognition.completed += 1; state.correctAnswers += 1;
     }
     item.lastPractised = today;
-    const canonicalId = globalThis.ContentModel?.canonicalIdForSetItem?.(itemId);
+    const canonicalId = globalThis.ContentModel?.canonicalIdForSetItem?.(setId, itemId);
     if (canonicalId) {
       const canonical = state.canonicalStats[canonicalId] ||= emptyCanonicalStats();
       canonical.recognition.responses += 1;
@@ -278,6 +278,11 @@
     canonical.lastPractised = today;
   }
 
+  function touchCanonical(state, contentId, practisedAt = dateKey()) {
+    const canonical = state.canonicalStats[contentId] ||= emptyCanonicalStats();
+    canonical.lastPractised = practisedAt;
+  }
+
   function completeTingxieItem(state, setId, item, mode, today = dateKey()) {
     const setHistory = state.tingxieHistory[setId] ||= { sessions: 0, items: {} };
     const itemHistory = setHistory.items[item.id] ||= { selfChecks: 0, firstCorrect: 0, completed: 0, studyCompleted: 0, lastPractised: "" };
@@ -300,5 +305,5 @@
   }
 
   globalThis.ProgressLogic = ProgressLogic;
-  globalThis.ProgressStore = { STORAGE_KEY, STATE_VERSION, dateKey, freshState, migrateState, recordQuestion, recordCanonicalRecognition, completeWriting, recordTingxieSelfCheck, completeTingxieItem, createStore, rolloverDay };
+  globalThis.ProgressStore = { STORAGE_KEY, STATE_VERSION, dateKey, freshState, migrateState, recordQuestion, recordCanonicalRecognition, touchCanonical, completeWriting, recordTingxieSelfCheck, completeTingxieItem, createStore, rolloverDay };
 })();

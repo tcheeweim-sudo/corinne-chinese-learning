@@ -1,11 +1,9 @@
 globalThis.ContentModel = (() => {
   const canonicalId = (target) => `zh:${target}`;
-  const canonicalIdForSetItem = (itemId) => {
-    for (const set of globalThis.TINGXIE_SETS || []) {
-      const item = set.items.find((entry) => entry.id === itemId);
-      if (item) return canonicalId(item.target);
-    }
-    return null;
+  const canonicalIdForSetItem = (setId, itemId) => {
+    const set = (globalThis.TINGXIE_SETS || []).find((entry) => entry.id === setId);
+    const item = set?.items.find((entry) => entry.id === itemId);
+    return item ? canonicalId(item.target) : null;
   };
 
   function buildCanonicalContent() {

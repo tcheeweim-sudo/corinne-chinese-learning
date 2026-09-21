@@ -58,13 +58,28 @@ document.getElementById('run').onclick = async () => {
     assert(!doc.getElementById('audioFailureActions').classList.contains('hidden'), 'Audio failure actions missing');
     assert(Object.keys(win.AppDebug.store.state.practiceSession.results).length === 0 && win.AppDebug.store.state.coins === coinsBeforeFailure, 'Audio failure recorded a result or reward');
     win.AppDebug.audio.play = async () => ({ ok:true, source:'local' });
-    click('testRetryAudio'); await pause(10); click('checkFreeWrite');
+    const drawStroke = () => {
+      const canvas = doc.getElementById('freeWriteCanvas');
+      const point = { bubbles:true, pointerId:7, pointerType:'pen', clientX:30, clientY:30, pressure:.6 };
+      canvas.dispatchEvent(new win.PointerEvent('pointerdown', point));
+      canvas.dispatchEvent(new win.PointerEvent('pointermove', { ...point, clientX:80, clientY:80 }));
+      canvas.dispatchEvent(new win.PointerEvent('pointerup', { ...point, clientX:80, clientY:80 }));
+    };
+    click('testRetryAudio'); await pause(10);
+    assert(doc.getElementById('checkFreeWrite').disabled, 'Audio success with a blank canvas must not enable Check');
+    click('checkFreeWrite');
+    assert(!doc.getElementById('practiceCard').textContent.includes(testTarget.target), 'Blank canvas revealed the answer');
+    drawStroke();
+    assert(!doc.getElementById('checkFreeWrite').disabled, 'A free-writing stroke did not enable Check');
+    click('clearFreeWrite');
+    assert(doc.getElementById('checkFreeWrite').disabled, 'Clear must reset ink and disable Check');
+    drawStroke(); click('checkFreeWrite');
     assert(doc.getElementById('practiceCard').textContent.includes(testTarget.target), 'Check did not reveal answer');
-    click('selfTry'); click('testPlayAudio'); await pause(10); click('checkFreeWrite'); click('selfGot');
+    click('selfTry'); click('testPlayAudio'); await pause(10); drawStroke(); click('checkFreeWrite'); click('selfGot');
     assert(win.AppDebug.store.state.practiceSession.results[testTarget.id].firstSelfCorrect === false, 'Retry overwrote first self-check');
     assert(win.AppDebug.store.state.coins === coinsBeforeFailure + 1, 'Completed Test did not award exactly one coin');
     win.AppDebug.store.state.practiceSession = null; win.AppDebug.store.save(); win.AppDebug.show('home');
-    log('PASS: four-choice home, Study writing, blank Test surface, audio failure guard, answer reveal and immutable first self-check');
+    log('PASS: four-choice home, Study writing, audio/ink guards, Clear reset, answer reveal and immutable first self-check');
 
     click('startMission'); click('introNext');
     const focusCount = win.AppDebug.store.state.mission.focusIds.length;
@@ -114,6 +129,23 @@ document.getElementById('run').onclick = async () => {
     assert(!doc.getElementById('revisionEmpty').classList.contains('hidden') && doc.getElementById('revisionEmpty').textContent.includes('Quick Revision'), 'Empty Weak Words state must offer Quick Revision');
     doc.querySelector('[data-revision-kind="quick"]').click();
     assert(win.AppDebug.store.state.revisionSession.items.length === 5, 'Quick Revision must select five items');
+    assert(doc.getElementById('revisionCard').textContent.includes('Review card'), 'Metadata-poor MOE content must be labelled Review card');
+    const reviewItem = win.AppDebug.store.state.revisionSession.items[0];
+    const recognitionBeforeReview = JSON.stringify(win.AppDebug.store.state.canonicalStats[reviewItem.contentId]?.recognition || {});
+    const revisionCoins = win.AppDebug.store.state.coins;
+    click('revNeed');
+    assert(win.AppDebug.store.state.revisionSession.items.length === 5 && win.AppDebug.store.state.revisionSession.items.at(-1).id === reviewItem.id, 'Need more practice must move the Review card later without exceeding the session cap');
+    assert(JSON.stringify(win.AppDebug.store.state.canonicalStats[reviewItem.contentId]?.recognition || {}) === recognitionBeforeReview, 'Review self-report contaminated objective recognition metrics');
+    assert(win.AppDebug.store.state.coins === revisionCoins, 'Need more practice awarded a completion reward');
+    const nextReview = win.AppDebug.store.state.revisionSession.items[win.AppDebug.store.state.revisionSession.itemIndex];
+    const objectiveCounts = contentId => {
+      const stats = win.AppDebug.store.state.canonicalStats[contentId]?.recognition || {};
+      return [stats.questionsAttempted || 0, stats.responses || 0, stats.firstCorrect || 0, stats.completed || 0].join(':');
+    };
+    const recognitionBeforeNext = objectiveCounts(nextReview.contentId);
+    click('revNext');
+    assert(objectiveCounts(nextReview.contentId) === recognitionBeforeNext, 'Review Next contaminated objective recognition metrics');
+    assert(win.AppDebug.store.state.coins === revisionCoins + 1, 'Completed Review card did not award exactly one coin');
     win.AppDebug.store.state.revisionSession = null; win.AppDebug.store.save();
     win.AppDebug.show('parent');
     doc.getElementById('revisionFullSize').value = '15';
@@ -175,7 +207,7 @@ document.getElementById('inspect').onclick = async () => {
     assert(registration?.active, 'No active service worker');
     for (let i = 0; i < 50 && (registration.installing || registration.waiting); i++) await pause(100);
     const names = (await caches.keys()).filter(name => name.startsWith('corinne-v'));
-    assert(names.length === 1 && names[0] === 'corinne-v0.3.0', 'Expected only the current V0.3 cache');
+    assert(names.length === 1 && names[0] === 'corinne-v0.3.1', 'Expected only the current V0.3 cache');
     const cache = await caches.open(names[0]);
     const keys = await cache.keys();
     assert(keys.filter(request => request.url.includes('/character-data/')).length === 19, 'Expected 19 character files');

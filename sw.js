@@ -1,5 +1,5 @@
 importScripts("./curriculum/moe-p1-standard.js", "./curriculum/tingxie.js", "./shop/tiger-house.js", "./tiger/assets.js");
-const CACHE_NAME = "corinne-v0.3.0";
+const CACHE_NAME = "corinne-v0.3.1";
 const APP_SHELL = [
   "./", "./index.html", "./styles.css", "./app.js", "./audio.js", "./mission.js", "./practice.js", "./revision.js", "./rewards.js", "./progress.js", "./freewrite.js",
   "./curriculum/moe-p1-standard.js", "./curriculum/tingxie.js", "./curriculum/content.js", "./shop/tiger-house.js", "./tiger/assets.js",

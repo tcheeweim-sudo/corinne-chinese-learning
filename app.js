@@ -210,7 +210,7 @@
     const mission = ensureMission();
     if (mission.stageAnswered || button.disabled) return;
     mission.questionTries += 1;
-    globalThis.ProgressStore.recordQuestion(store.state, item.id, correct, mission.questionTries, today);
+    globalThis.ProgressStore.recordQuestion(store.state, set.id, item.id, correct, mission.questionTries, today);
     if (!correct) {
       button.disabled = true;
       button.classList.add("wrong");
@@ -389,7 +389,7 @@
 
   function startPractice() {
     refreshDay();
-    store.state.practiceSession = globalThis.PracticeLogic.createSession(activePracticeSet(), practiceChoice.mode, practiceChoice.size, today);
+    store.state.practiceSession = globalThis.PracticeLogic.createSession(activePracticeSet(), practiceChoice.mode, practiceChoice.size, today, store.state);
     save();
     show("practiceRun");
   }
@@ -472,13 +472,14 @@
     }
     // This DOM intentionally contains no target, pinyin, meaning, outline, hint, or answer-bearing label.
     host.innerHTML = `${stageHeader("Test", session.itemIndex, session.itemIds.length)}<h2 class="center">Listen and write what you hear</h2><div class="audio-actions"><button id="testPlayAudio" class="listen-button"><span aria-hidden="true">🔊</span><span>Play word</span></button></div><p id="testAudioStatus" class="audio-status" aria-live="polite">Play the word before writing.</p><div id="audioFailureActions" class="audio-actions hidden"><button id="testRetryAudio" class="btn">Retry audio</button><button id="testSkip" class="btn">Skip</button><button id="testStudy" class="btn">Study this item</button></div><div class="freewrite-wrap"><canvas id="freeWriteCanvas" class="freewrite-canvas" aria-label="Blank free-writing surface"></canvas><div class="freewrite-tools"><button id="clearFreeWrite" class="btn compact">Clear</button><button id="checkFreeWrite" class="btn primary" disabled>Check answer</button></div></div>`;
-    freeWrite = new globalThis.FreeWriteSurface($("freeWriteCanvas"));
+    const syncCheck = () => { $("checkFreeWrite").disabled = !(session.audioReady && freeWrite?.hasInk); };
+    freeWrite = new globalThis.FreeWriteSurface($("freeWriteCanvas"), syncCheck);
     $("clearFreeWrite").addEventListener("click", () => freeWrite.clear());
     const play = async () => {
       $("testAudioStatus").textContent = "Trying pronunciation…";
       const outcome = await audio.play(item, (message, source) => { $("testAudioStatus").textContent = source === "unavailable" ? "Sound is unavailable. Try again, skip, or study this item." : message; });
       session.audioReady = outcome.ok;
-      $("checkFreeWrite").disabled = !outcome.ok;
+      syncCheck();
       $("audioFailureActions").classList.toggle("hidden", outcome.ok);
       save();
     };
@@ -486,7 +487,7 @@
     $("testRetryAudio").addEventListener("click", play);
     $("testSkip").addEventListener("click", () => advancePractice(session));
     $("testStudy").addEventListener("click", () => { session.mode = "study"; session.itemIds = [item.id]; session.itemIndex = 0; session.characterIndex = 0; session.phase = "study"; session.studyOnly = true; save(); renderPracticeSession(); });
-    $("checkFreeWrite").addEventListener("click", () => { if (!session.audioReady) return; session.phase = "reveal"; save(); renderPracticeSession(); });
+    $("checkFreeWrite").addEventListener("click", () => { if (!session.audioReady || !freeWrite?.hasInk) return; session.phase = "reveal"; save(); renderPracticeSession(); });
     if (result?.firstSelfCorrect === false) $("testAudioStatus").textContent = "Try once more, then check again.";
   }
 
@@ -538,7 +539,7 @@
       $("emptyQuick")?.addEventListener("click", () => startRevision("quick"));
       return;
     }
-    store.state.revisionSession = { id: `${today}:${kind}:${Date.now()}`, date: today, kind, items: selected, itemIndex: 0, phase: "question", tries: 0, completed: false, coinsEarned: 0 };
+    store.state.revisionSession = { id: `${today}:${kind}:${Date.now()}`, date: today, kind, items: selected, itemIndex: 0, phase: "question", tries: 0, reviewRequeued: {}, completed: false, coinsEarned: 0 };
     save(); show("revisionRun");
   }
 
@@ -555,13 +556,25 @@
     if (!activity) return finishRevision(session);
     if (activity.activity === "writing") renderRevisionWriting(host, session, activity);
     else if (activity.source === "tingxie" && activity.audio) renderRevisionListening(host, session, activity);
-    else renderRevisionFlashcard(host, session, activity);
+    else renderRevisionReview(host, session, activity);
   }
 
-  function renderRevisionFlashcard(host, session, activity) {
-    host.innerHTML = `${stageHeader("Recognition", session.itemIndex, session.items.length)}<p class="center muted">Look carefully at this character.</p><div class="learning-word"><div class="large-hanzi">${escapeHtml(activity.target)}</div></div><div class="option-grid"><button id="revAgain" class="btn">Practise again</button><button id="revKnow" class="btn primary">I know it</button></div>`;
-    $("revAgain").addEventListener("click", () => completeRevisionActivity(session, activity, false));
-    $("revKnow").addEventListener("click", () => completeRevisionActivity(session, activity, true));
+  function renderRevisionReview(host, session, activity) {
+    host.innerHTML = `${stageHeader("Review card", session.itemIndex, session.items.length)}<p class="center muted">Review this character. This card is not scored.</p><div class="learning-word"><div class="large-hanzi">${escapeHtml(activity.target)}</div></div><div class="option-grid"><button id="revNeed" class="btn">Need more practice</button><button id="revNext" class="btn primary">Next</button></div>`;
+    $("revNeed").addEventListener("click", () => deferRevisionReview(session, activity));
+    $("revNext").addEventListener("click", () => completeRevisionActivity(session, activity));
+  }
+
+  function deferRevisionReview(session, activity) {
+    session.reviewRequeued ||= {};
+    if (!session.reviewRequeued[activity.id]) {
+      session.reviewRequeued[activity.id] = true;
+      session.items.splice(session.itemIndex, 1);
+      session.items.push({ ...activity, reviewRetry: true });
+      save(); renderRevisionSession(); return;
+    }
+    session.itemIndex += 1;
+    if (session.itemIndex >= session.items.length) finishRevision(session); else { save(); renderRevisionSession(); }
   }
 
   function renderRevisionListening(host, session, activity) {
@@ -575,7 +588,7 @@
         const correct = option.target === activity.target; session.tries += 1;
         globalThis.ProgressStore.recordCanonicalRecognition(store.state, activity.contentId, correct, session.tries, today);
         if (!correct) { button.disabled = true; button.classList.add("wrong"); $("revisionFeedback").textContent = "Try again."; save(); return; }
-        completeRevisionActivity(session, activity, true);
+        completeRevisionActivity(session, activity);
       });
       $("revisionChoices").append(button);
     }
@@ -586,13 +599,13 @@
     let hints = 0;
     createGuidedWriter("modeCharacterTarget", activity.target, () => {
       globalThis.ProgressStore.completeWriting(store.state, activity.target, [], hints, today);
-      completeRevisionActivity(session, activity, true);
+      completeRevisionActivity(session, activity);
     }, () => { hints += 1; });
   }
 
-  function completeRevisionActivity(session, activity, correct) {
-    if (activity.source === "moe" && activity.activity === "recognition") globalThis.ProgressStore.recordCanonicalRecognition(store.state, activity.contentId, correct, 1, today);
+  function completeRevisionActivity(session, activity) {
     const reward = globalThis.RewardLogic.claim(store.state, { mode: "revision", activity: activity.activity, contentId: activity.contentId, today });
+    globalThis.ProgressStore.touchCanonical(store.state, activity.contentId, new Date().toISOString());
     session.coinsEarned += reward.awarded; session.itemIndex += 1; session.tries = 0;
     if (session.itemIndex >= session.items.length) finishRevision(session); else { save(); renderRevisionSession(); }
   }
