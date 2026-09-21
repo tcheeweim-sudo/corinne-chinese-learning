@@ -19,9 +19,10 @@
   </header>
 
   <section id="home" class="screen active">
-    <div class="home-hero">
+    <div class="home-grid" aria-label="Choose an activity">
+    <article class="home-hero home-choice mission-choice">
       <div class="sun-shape" aria-hidden="true"></div>
-      <img src="./tiger/assets/tiger-placeholder.svg" class="tiger home-tiger" alt="A friendly orange tiger mascot">
+      <img data-tiger-state="home" class="tiger home-tiger" alt="A friendly orange tiger mascot">
       <div class="home-copy">
         <span class="eyebrow">TODAY'S MISSION</span>
         <h1>Ready to practise?</h1>
@@ -30,8 +31,11 @@
         <p id="homeProgressText" class="progress-text">0% of today's mission</p>
         <button id="startMission" class="btn primary mission-button">Start today's mission</button>
       </div>
+    </article>
+    <button id="openPractice" class="home-choice destination-card"><span class="destination-icon">听</span><span><b>Practice 听写</b><small>Study or test this week's words</small></span><span aria-hidden="true">›</span></button>
+    <button id="openRevision" class="home-choice destination-card"><span class="destination-icon">习</span><span><b>Revision</b><small>Quick, full, or weak words</small></span><span aria-hidden="true">›</span></button>
+    <button id="openHouse" class="home-choice destination-card"><span class="destination-icon">⌂</span><span><b>Tiger House</b><small>Use your coins to make it cosy</small></span><span aria-hidden="true">›</span></button>
     </div>
-    <button id="openHouse" class="house-entry"><span class="house-icon">⌂</span><span><b>Tiger House</b><small>Use your coins to make it cosy</small></span><span aria-hidden="true">›</span></button>
     <button id="openParent" class="parent-link">For grown-ups</button>
   </section>
 
@@ -40,12 +44,44 @@
     <div id="missionCard" class="card mission-card"></div>
   </section>
 
+  <section id="practice" class="screen">
+    <div class="section-heading"><button class="back-link" data-home>‹ Home</button><h1>Practice 听写</h1><span></span></div>
+    <div class="card setup-card">
+      <h2>Choose a spelling list</h2><div id="practiceSetList" class="set-list"></div>
+      <h2>How would you like to practise?</h2>
+      <div class="option-grid"><button id="practiceStudy" class="btn option active">Study</button><button id="practiceTest" class="btn option">Test</button></div>
+      <h2>How many?</h2>
+      <div class="option-grid three"><button data-practice-size="3" class="btn option active">Practice 3</button><button data-practice-size="5" class="btn option">Practice 5</button><button data-practice-size="all" class="btn option">Practice all</button></div>
+      <button id="startPractice" class="btn primary wide">Start Study</button>
+    </div>
+  </section>
+
+  <section id="practiceRun" class="screen">
+    <button class="back-link" data-practice-menu>‹ Practice 听写</button>
+    <div id="practiceCard" class="card mission-card"></div>
+  </section>
+
+  <section id="revision" class="screen">
+    <div class="section-heading"><button class="back-link" data-home>‹ Home</button><h1>Revision</h1><span></span></div>
+    <div class="revision-options">
+      <button class="home-choice destination-card" data-revision-kind="quick"><span class="destination-icon">5</span><span><b>Quick Revision</b><small>Five useful items</small></span><span>›</span></button>
+      <button class="home-choice destination-card" data-revision-kind="full"><span class="destination-icon">全</span><span><b>Full Revision</b><small>Parent-selected revision scope</small></span><span>›</span></button>
+      <button class="home-choice destination-card" data-revision-kind="weak"><span class="destination-icon">练</span><span><b>Weak Words</b><small>Practise items that need help</small></span><span>›</span></button>
+    </div>
+    <div id="revisionEmpty" class="card hidden center" aria-live="polite"></div>
+  </section>
+
+  <section id="revisionRun" class="screen">
+    <button class="back-link" data-revision-menu>‹ Revision</button>
+    <div id="revisionCard" class="card mission-card"></div>
+  </section>
+
   <section id="house" class="screen">
     <div class="section-heading"><button class="back-link" data-home>‹ Home</button><h1>Tiger House</h1><span></span></div>
     <p id="houseMessage" class="center muted" aria-live="polite">Choose cosy things for Tiger's room.</p>
     <div class="tiger-room">
       <div id="roomSlots" class="room-slots"></div>
-      <img src="./tiger/assets/tiger-placeholder.svg" class="tiger room-tiger" alt="Tiger in a cosy room">
+      <img data-tiger-state="house" class="tiger room-tiger" alt="Tiger in a cosy room">
     </div>
     <h2 class="shop-title">Cosy shop</h2>
     <div id="shopCatalogue" class="shop-catalogue"></div>
@@ -59,15 +95,32 @@
       <h2>Weak items</h2><p id="weakItems">No weak items yet.</p>
       <h2>Spelling item mastery</h2><div id="itemMastery"></div>
       <h2>Lesson 16 writing</h2><div id="characterMastery" class="character-mastery"></div>
+      <h2>Revision settings</h2>
+      <div class="settings-grid">
+        <label>From lesson <input id="revisionFrom" type="number" min="1" max="16"></label>
+        <label>To lesson <input id="revisionTo" type="number" min="1" max="16"></label>
+        <label>Content <select id="revisionType"><option value="mixed">Recognition + writing</option><option value="recognition">Recognition</option><option value="writing">Writing</option></select></label>
+        <label>Full session size <input id="revisionFullSize" type="number" min="10" max="15"></label>
+        <label class="check-setting"><input id="revisionCurrent" type="checkbox"> Include current 听写</label>
+        <label class="check-setting"><input id="revisionArchived" type="checkbox"> Include archived 听写</label>
+        <label class="check-setting"><input id="revisionWeak" type="checkbox"> Emphasise weak items</label>
+      </div>
+      <p id="settingsStatus" class="muted" aria-live="polite">Settings save on this device.</p>
     </div>
   </section>
 </main>
 <script src="./curriculum/moe-p1-standard.js"></script>
 <script src="./curriculum/tingxie.js"></script>
+<script src="./curriculum/content.js"></script>
 <script src="./mission.js"></script>
+<script src="./practice.js"></script>
+<script src="./revision.js"></script>
+<script src="./rewards.js"></script>
 <script src="./shop/tiger-house.js"></script>
+<script src="./tiger/assets.js"></script>
 <script src="./progress.js"></script>
 <script src="./audio.js"></script>
+<script src="./freewrite.js"></script>
 <script src="./vendor/hanzi-writer.min.js"></script>
 <script src="./app.js"></script>
 </body>

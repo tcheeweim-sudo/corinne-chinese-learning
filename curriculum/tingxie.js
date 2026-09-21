@@ -23,6 +23,7 @@ globalThis.getActiveTingxie = () => globalThis.TINGXIE_SETS.find((set) => set.st
 globalThis.CURRICULUM = globalThis.getActiveTingxie().items;
 const associatedLesson = globalThis.getMoeLesson(globalThis.getActiveTingxie().lessonId);
 globalThis.REQUIRED_CHARACTERS = [...new Set([
-  ...globalThis.CURRICULUM.flatMap((item) => [...item.target]),
+  ...globalThis.TINGXIE_SETS.flatMap((set) => set.items.flatMap((item) => [...item.target])),
+  ...globalThis.MOE_P1_STANDARD.lessons.flatMap((lesson) => lesson.writing || []),
   ...(associatedLesson?.writing || [])
 ])];
