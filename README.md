@@ -70,7 +70,7 @@ When approved files are added at the exact paths above, no curriculum or service
 4. If the `github-pages` environment requires approval, approve the deployment in Actions.
 5. Open <https://tcheeweim-sudo.github.io/corinne-chinese-learning/> after the deploy job succeeds. This is the expected project URL, not a claim that V0.3 has been deployed.
 
-The staged site includes `curriculum/`, `shop/`, `tiger/`, `audio/`, `icons/`, `vendor/`, `character-data/`, and only the runtime files below `assets/tiger/`. Reference sheets and asset masters are kept in the repository but excluded from the deployed site and offline cache. Relative URLs, manifest scope, and service-worker scope support the repository subdirectory.
+The staged site includes `curriculum/`, `shop/`, `tiger/`, `audio/`, `icons/`, `vendor/`, `character-data/`, and only the runtime files below `assets/tiger/`. Reference sheets and source masters live in Google Drive and are excluded from this public repository, the deployed site, and the offline cache. Relative URLs, manifest scope, and service-worker scope support the repository subdirectory.
 
 ## Install or update on Android
 
@@ -122,7 +122,6 @@ On visibility/resume and before mission actions, the app recalculates the local 
 
 - Runtime Tiger poses live in `assets/tiger/poses/`. `tiger/assets.js` maps `home`, `happy`, `celebrate`, `encourage`, `thinking`, `writing`, `sleeping`, and `house` to those files, so pose artwork can be replaced without changing screen logic.
 - Tiger House uses `assets/tiger/house/house-room-empty.png` plus individually layered files in `assets/tiger/items/`. Catalogue image paths stay in `shop/tiger-house.js`; preset slot CSS controls placement. Ribbon and hat share the accessory slot and are aligned by using the same canvas bounds as `tiger-house.png`.
-- `assets/tiger/house/house-room-reference.png`, `assets/tiger/items/tiger-accessory-alignment-reference.png`, and everything in `assets/reference/` are design references only. They must not be referenced by the app, staged to Pages, or added to the service-worker cache.
-- `assets/tiger/icons/app-icon-master.png` supplies the 192 px and 512 px app icons. The approved transparent favicon master supplies `icons/favicon-32.png` and the padded 512 px maskable icon, keeping the Tiger face inside the central safe area. `coin-icon.png` and `badge-star.png` are runtime UI art.
-- `ASSET_AUDIT.json` records the supplied source dimensions and transparency, while `ASSET_PACK_README.md` records the source-pack usage rules.
+- Design references and source masters live in Google Drive. Their local working paths are ignored by Git and must not be referenced by the app, staged to Pages, or added to the service-worker cache.
+- The checked-in 192 px, 512 px, maskable, and favicon files were derived from the approved icon masters. Keep the Tiger face inside the maskable safe area when regenerating them. `coin-icon.png` and `badge-star.png` remain runtime UI art.
 - Increment the worker cache version whenever replacing runtime assets. Run validation and the browser smoke suite before deployment; Pages stages only the approved runtime subset.
