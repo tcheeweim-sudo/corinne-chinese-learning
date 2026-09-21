@@ -41,7 +41,7 @@ jobs:
       - name: Stage only public app files
         run: |
           mkdir _site
-          cp index.html styles.css app.js audio.js mission.js progress.js manifest.webmanifest sw.js THIRD_PARTY_NOTICES.md _site/
+          cp index.html styles.css app.js audio.js mission.js practice.js revision.js rewards.js progress.js freewrite.js manifest.webmanifest sw.js THIRD_PARTY_NOTICES.md _site/
           cp -R icons vendor character-data curriculum shop tiger audio _site/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3

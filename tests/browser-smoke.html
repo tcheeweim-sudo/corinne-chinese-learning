@@ -1,8 +1,8 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>V0.2 local browser smoke checks</title>
+<title>V0.3 local browser smoke checks</title>
 <style>body{font-family:system-ui;margin:20px}button{padding:10px;margin:4px}pre{white-space:pre-wrap}iframe{display:block;margin-top:12px;border:1px solid #aaa}</style>
-<h1>V0.2 local browser smoke checks</h1>
+<h1>V0.3 local browser smoke checks</h1>
 <p>Run only on the local test server. Progress is backed up and restored.</p>
 <button id="run">Run functional checks</button>
 <button id="inspect">Inspect offline cache</button>
@@ -38,6 +38,54 @@ document.getElementById('run').onclick = async () => {
       correct.click();
       assert(win.AppDebug.store.state.coins === lockedCoins, 'Repeated answer charged a reward');
     };
+
+    assert(doc.querySelectorAll('#home .home-choice').length === 4, 'Home must show four choices');
+    click('openPractice');
+    assert(doc.querySelectorAll('#practiceSetList .set-option').length >= 1, 'Current 听写 set is missing');
+    click('practiceStudy'); click('startPractice');
+    assert(doc.getElementById('practiceCard').textContent.includes(win.CURRICULUM[0].target), 'Study must show Chinese');
+    assert(doc.querySelector('#modeCharacterTarget svg'), 'Study must render guided Hanzi Writer');
+    win.AppDebug.store.state.practiceSession = null; win.AppDebug.store.save(); win.AppDebug.show('practice');
+    click('practiceTest'); click('startPractice');
+    const testTarget = win.CURRICULUM[0];
+    const hiddenText = doc.getElementById('practiceCard').textContent;
+    assert(!hiddenText.includes(testTarget.target) && !hiddenText.includes(testTarget.pinyin), 'Test leaked its answer before Check');
+    assert(doc.getElementById('freeWriteCanvas') && !doc.querySelector('#practiceCard svg'), 'Test must use a blank canvas, not Hanzi Writer');
+    const coinsBeforeFailure = win.AppDebug.store.state.coins;
+    win.AppDebug.audio.play = async (_item, report) => { report('Audio unavailable.', 'unavailable'); return { ok:false, source:'unavailable' }; };
+    click('testPlayAudio'); await pause(10);
+    assert(doc.getElementById('checkFreeWrite').disabled, 'Audio failure must keep Check disabled');
+    assert(!doc.getElementById('audioFailureActions').classList.contains('hidden'), 'Audio failure actions missing');
+    assert(Object.keys(win.AppDebug.store.state.practiceSession.results).length === 0 && win.AppDebug.store.state.coins === coinsBeforeFailure, 'Audio failure recorded a result or reward');
+    win.AppDebug.audio.play = async () => ({ ok:true, source:'local' });
+    const drawStroke = () => {
+      const canvas = doc.getElementById('freeWriteCanvas');
+      const point = { bubbles:true, pointerId:7, pointerType:'pen', clientX:30, clientY:30, pressure:.6 };
+      canvas.dispatchEvent(new win.PointerEvent('pointerdown', point));
+      canvas.dispatchEvent(new win.PointerEvent('pointermove', { ...point, clientX:80, clientY:80 }));
+      canvas.dispatchEvent(new win.PointerEvent('pointerup', { ...point, clientX:80, clientY:80 }));
+    };
+    click('testRetryAudio'); await pause(10);
+    assert(doc.getElementById('checkFreeWrite').disabled, 'Audio success with a blank canvas must not enable Check');
+    click('checkFreeWrite');
+    assert(!doc.getElementById('practiceCard').textContent.includes(testTarget.target), 'Blank canvas revealed the answer');
+    const blankCanvas = doc.getElementById('freeWriteCanvas');
+    blankCanvas.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles:true, pointerId:7, clientX:30, clientY:30 }));
+    assert(doc.getElementById('checkFreeWrite').disabled, 'Pointerdown alone must leave Check disabled');
+    blankCanvas.dispatchEvent(new win.PointerEvent('pointermove', { bubbles:true, pointerId:7, clientX:30, clientY:30 }));
+    assert(doc.getElementById('checkFreeWrite').disabled, 'Stationary pointermove must leave Check disabled');
+    blankCanvas.dispatchEvent(new win.PointerEvent('pointerup', { bubbles:true, pointerId:7, clientX:30, clientY:30 }));
+    drawStroke();
+    assert(!doc.getElementById('checkFreeWrite').disabled, 'A free-writing stroke did not enable Check');
+    click('clearFreeWrite');
+    assert(doc.getElementById('checkFreeWrite').disabled, 'Clear must reset ink and disable Check');
+    drawStroke(); click('checkFreeWrite');
+    assert(doc.getElementById('practiceCard').textContent.includes(testTarget.target), 'Check did not reveal answer');
+    click('selfTry'); click('testPlayAudio'); await pause(10); drawStroke(); click('checkFreeWrite'); click('selfGot');
+    assert(win.AppDebug.store.state.practiceSession.results[testTarget.id].firstSelfCorrect === false, 'Retry overwrote first self-check');
+    assert(win.AppDebug.store.state.coins === coinsBeforeFailure + 1, 'Completed Test did not award exactly one coin');
+    win.AppDebug.store.state.practiceSession = null; win.AppDebug.store.save(); win.AppDebug.show('home');
+    log('PASS: four-choice home, Study writing, audio/ink guards, Clear reset, answer reveal and immutable first self-check');
 
     click('startMission'); click('introNext');
     const focusCount = win.AppDebug.store.state.mission.focusIds.length;
@@ -77,7 +125,40 @@ document.getElementById('run').onclick = async () => {
     assert(win.AppDebug.store.state.coins === completedCoins, 'Reload duplicated mission completion reward');
     win.AppDebug.show('parent');
     assert(doc.getElementById('parentSummary').textContent.includes('Answer responses'), 'Parent response metric missing');
+    assert(doc.getElementById('parentSummary').textContent.includes('First-attempt self-check'), 'Parent self-check metric missing');
     log('PASS: recall, mission reward anti-farming, streak, parent metrics and local reload');
+
+    win.AppDebug.store.state.canonicalStats = {};
+    win.AppDebug.store.save();
+    win.AppDebug.show('revision');
+    doc.querySelector('[data-revision-kind="weak"]').click();
+    assert(!doc.getElementById('revisionEmpty').classList.contains('hidden') && doc.getElementById('revisionEmpty').textContent.includes('Quick Revision'), 'Empty Weak Words state must offer Quick Revision');
+    doc.querySelector('[data-revision-kind="quick"]').click();
+    assert(win.AppDebug.store.state.revisionSession.items.length === 5, 'Quick Revision must select five items');
+    assert(doc.getElementById('revisionCard').textContent.includes('Review card'), 'Metadata-poor MOE content must be labelled Review card');
+    const reviewItem = win.AppDebug.store.state.revisionSession.items[0];
+    const recognitionBeforeReview = JSON.stringify(win.AppDebug.store.state.canonicalStats[reviewItem.contentId]?.recognition || {});
+    const revisionCoins = win.AppDebug.store.state.coins;
+    click('revNeed');
+    assert(win.AppDebug.store.state.revisionSession.items.length === 5 && win.AppDebug.store.state.revisionSession.items.at(-1).id === reviewItem.id, 'Need more practice must move the Review card later without exceeding the session cap');
+    assert(JSON.stringify(win.AppDebug.store.state.canonicalStats[reviewItem.contentId]?.recognition || {}) === recognitionBeforeReview, 'Review self-report contaminated objective recognition metrics');
+    assert(win.AppDebug.store.state.coins === revisionCoins, 'Need more practice awarded a completion reward');
+    const nextReview = win.AppDebug.store.state.revisionSession.items[win.AppDebug.store.state.revisionSession.itemIndex];
+    const objectiveCounts = contentId => {
+      const stats = win.AppDebug.store.state.canonicalStats[contentId]?.recognition || {};
+      return [stats.questionsAttempted || 0, stats.responses || 0, stats.firstCorrect || 0, stats.completed || 0].join(':');
+    };
+    const recognitionBeforeNext = objectiveCounts(nextReview.contentId);
+    click('revNext');
+    assert(objectiveCounts(nextReview.contentId) === recognitionBeforeNext, 'Review Next contaminated objective recognition metrics');
+    assert(win.AppDebug.store.state.coins === revisionCoins + 1, 'Completed Review card did not award exactly one coin');
+    win.AppDebug.store.state.revisionSession = null; win.AppDebug.store.save();
+    win.AppDebug.show('parent');
+    doc.getElementById('revisionFullSize').value = '15';
+    doc.getElementById('revisionFullSize').dispatchEvent(new Event('change'));
+    await load(); win = frame.contentWindow; doc = frame.contentDocument;
+    assert(win.AppDebug.store.state.revisionSettings.fullSize === 15, 'Revision settings did not persist');
+    log('PASS: Quick Revision size and parent settings persistence');
 
     // Seed shop funds independently of the now-shorter mission reward.
     win.AppDebug.store.state.coins += 20;
@@ -132,14 +213,14 @@ document.getElementById('inspect').onclick = async () => {
     assert(registration?.active, 'No active service worker');
     for (let i = 0; i < 50 && (registration.installing || registration.waiting); i++) await pause(100);
     const names = (await caches.keys()).filter(name => name.startsWith('corinne-v'));
-    assert(names.length === 1 && names[0] === 'corinne-v0.2.2', 'Expected only the current V0.2 cache');
+    assert(names.length === 1 && names[0] === 'corinne-v0.3.1', 'Expected only the current V0.3 cache');
     const cache = await caches.open(names[0]);
     const keys = await cache.keys();
     assert(keys.filter(request => request.url.includes('/character-data/')).length === 19, 'Expected 19 character files');
-    for (const asset of ['index.html','app.js','audio.js','mission.js','progress.js','curriculum/tingxie.js','shop/tiger-house.js','tiger/assets/tiger-placeholder.svg']) {
+    for (const asset of ['index.html','app.js','audio.js','mission.js','practice.js','revision.js','rewards.js','freewrite.js','progress.js','curriculum/content.js','curriculum/tingxie.js','shop/tiger-house.js','tiger/assets.js','tiger/assets/tiger-placeholder.svg']) {
       assert(await cache.match(new URL('../' + asset, location.href)), 'Missing cached asset: ' + asset);
     }
-    log('PASS: active V0.2 worker, offline app shell and all 19 character files');
+    log('PASS: active V0.3 worker, offline app shell and all 19 character files');
   } catch (error) { log('FAIL: ' + error.message); }
 };
 </script>
