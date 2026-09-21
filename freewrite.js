@@ -32,8 +32,8 @@ globalThis.FreeWriteSurface = class FreeWriteSurface {
   }
   point(event) { const rect = this.canvas.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; }
   setInk(value) { if (this.hasInk !== value) { this.hasInk = value; this.onInkChange(value); } }
-  onDown(event) { event.preventDefault(); try { this.canvas.setPointerCapture?.(event.pointerId); } catch (_error) {} this.pointer = event.pointerId; this.setInk(true); const p = this.point(event); this.context.beginPath(); this.context.moveTo(p.x, p.y); }
-  onMove(event) { if (event.pointerId !== this.pointer) return; event.preventDefault(); const p = this.point(event); this.context.lineWidth = 4 + (event.pressure || .5) * 5; this.context.lineTo(p.x, p.y); this.context.stroke(); }
+  onDown(event) { event.preventDefault(); try { this.canvas.setPointerCapture?.(event.pointerId); } catch (_error) {} this.pointer = event.pointerId; const p = this.point(event); this.lastPoint = p; this.context.beginPath(); this.context.moveTo(p.x, p.y); }
+  onMove(event) { if (event.pointerId !== this.pointer) return; event.preventDefault(); const p = this.point(event); if (p.x === this.lastPoint.x && p.y === this.lastPoint.y) return; this.context.lineWidth = 4 + (event.pressure || .5) * 5; this.context.lineTo(p.x, p.y); this.context.stroke(); this.lastPoint = p; this.setInk(true); }
   onUp(event) { if (event.pointerId === this.pointer) this.pointer = null; }
   clear() { this.context.clearRect(0, 0, this.canvas.width, this.canvas.height); this.setInk(false); }
   destroy() { this.observer.disconnect(); for (const [name, handler] of [["pointerdown", this.onDown], ["pointermove", this.onMove], ["pointerup", this.onUp], ["pointercancel", this.onUp]]) this.canvas.removeEventListener(name, handler); }

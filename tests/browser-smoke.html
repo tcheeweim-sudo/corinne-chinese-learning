@@ -69,6 +69,12 @@ document.getElementById('run').onclick = async () => {
     assert(doc.getElementById('checkFreeWrite').disabled, 'Audio success with a blank canvas must not enable Check');
     click('checkFreeWrite');
     assert(!doc.getElementById('practiceCard').textContent.includes(testTarget.target), 'Blank canvas revealed the answer');
+    const blankCanvas = doc.getElementById('freeWriteCanvas');
+    blankCanvas.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles:true, pointerId:7, clientX:30, clientY:30 }));
+    assert(doc.getElementById('checkFreeWrite').disabled, 'Pointerdown alone must leave Check disabled');
+    blankCanvas.dispatchEvent(new win.PointerEvent('pointermove', { bubbles:true, pointerId:7, clientX:30, clientY:30 }));
+    assert(doc.getElementById('checkFreeWrite').disabled, 'Stationary pointermove must leave Check disabled');
+    blankCanvas.dispatchEvent(new win.PointerEvent('pointerup', { bubbles:true, pointerId:7, clientX:30, clientY:30 }));
     drawStroke();
     assert(!doc.getElementById('checkFreeWrite').disabled, 'A free-writing stroke did not enable Check');
     click('clearFreeWrite');
