@@ -1,13 +1,14 @@
 globalThis.TigerHouse = (() => {
   const catalogue = [
-    { id: "cloud-pillow", name: "Cloud Pillow", price: 20, slot: "pillow", image: null, placeholder: "☁️" },
-    { id: "peach-rug", name: "Peach Rug", price: 30, slot: "rug", image: null, placeholder: "🟠" },
-    { id: "warm-lamp", name: "Warm Lamp", price: 40, slot: "lamp", image: null, placeholder: "💡" },
-    { id: "little-plant", name: "Little Plant", price: 50, slot: "plant", image: null, placeholder: "🪴" },
-    { id: "tiger-picture", name: "Tiger Picture", price: 60, slot: "picture", image: null, placeholder: "🖼️" },
-    { id: "toy-basket", name: "Toy Basket", price: 75, slot: "basket", image: null, placeholder: "🧺" },
-    { id: "cosy-bed", name: "Cosy Bed", price: 90, slot: "bed", image: null, placeholder: "🛏️" },
-    { id: "peach-ribbon", name: "Peach Ribbon", price: 120, slot: "accessory", image: null, placeholder: "🎀" }
+    { id: "cloud-pillow", name: "Cloud Pillow", price: 20, slot: "pillow", image: "./assets/tiger/items/house-pillow.png", placeholder: "☁️" },
+    { id: "peach-rug", name: "Peach Rug", price: 30, slot: "rug", image: "./assets/tiger/items/house-rug.png", placeholder: "🟠" },
+    { id: "warm-lamp", name: "Warm Lamp", price: 40, slot: "lamp", image: "./assets/tiger/items/house-lamp.png", placeholder: "💡" },
+    { id: "little-plant", name: "Little Plant", price: 50, slot: "plant", image: "./assets/tiger/items/house-plant.png", placeholder: "🪴" },
+    { id: "tiger-picture", name: "Tiger Picture", price: 60, slot: "picture", image: "./assets/tiger/items/house-picture.png", placeholder: "🖼️" },
+    { id: "toy-basket", name: "Toy Basket", price: 75, slot: "basket", image: "./assets/tiger/items/house-basket.png", placeholder: "🧺" },
+    { id: "cosy-bed", name: "Cosy Bed", price: 90, slot: "bed", image: "./assets/tiger/items/house-bed.png", placeholder: "🛏️" },
+    { id: "peach-ribbon", name: "Peach Ribbon", price: 120, slot: "accessory", image: "./assets/tiger/items/tiger-ribbon.png", placeholder: "🎀" },
+    { id: "sunny-hat", name: "Sunny Hat", price: 120, slot: "accessory", image: "./assets/tiger/items/tiger-hat.png", placeholder: "👒" }
   ];
 
   function freshHouse() { return { owned: [], slots: {}, purchases: [] }; }

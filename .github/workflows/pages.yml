@@ -43,6 +43,11 @@ jobs:
           mkdir _site
           cp index.html styles.css app.js audio.js mission.js practice.js revision.js rewards.js progress.js freewrite.js manifest.webmanifest sw.js THIRD_PARTY_NOTICES.md _site/
           cp -R icons vendor character-data curriculum shop tiger audio _site/
+          mkdir -p _site/assets/tiger/poses _site/assets/tiger/house _site/assets/tiger/items _site/assets/tiger/icons
+          cp assets/tiger/poses/*.png _site/assets/tiger/poses/
+          cp assets/tiger/house/house-room-empty.png _site/assets/tiger/house/
+          cp assets/tiger/items/house-*.png assets/tiger/items/tiger-ribbon.png assets/tiger/items/tiger-hat.png _site/assets/tiger/items/
+          cp assets/tiger/icons/coin-icon.png assets/tiger/icons/badge-star.png _site/assets/tiger/icons/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

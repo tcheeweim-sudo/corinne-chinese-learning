@@ -1,8 +1,8 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>V0.3 local browser smoke checks</title>
+<title>V0.3.1 local browser smoke checks</title>
 <style>body{font-family:system-ui;margin:20px}button{padding:10px;margin:4px}pre{white-space:pre-wrap}iframe{display:block;margin-top:12px;border:1px solid #aaa}</style>
-<h1>V0.3 local browser smoke checks</h1>
+<h1>V0.3.1 local browser smoke checks</h1>
 <p>Run only on the local test server. Progress is backed up and restored.</p>
 <button id="run">Run functional checks</button>
 <button id="inspect">Inspect offline cache</button>
@@ -40,6 +40,8 @@ document.getElementById('run').onclick = async () => {
     };
 
     assert(doc.querySelectorAll('#home .home-choice').length === 4, 'Home must show four choices');
+    assert(doc.querySelector('[data-tiger-state="home"]').src.includes('/assets/tiger/poses/tiger-home.png'), 'Home does not use the approved Tiger pose');
+    assert(doc.querySelector('.coin-balance img').naturalWidth === 1024, 'Approved coin icon did not load');
     click('openPractice');
     assert(doc.querySelectorAll('#practiceSetList .set-option').length >= 1, 'Current 听写 set is missing');
     click('practiceStudy'); click('startPractice');
@@ -164,15 +166,31 @@ document.getElementById('run').onclick = async () => {
     win.AppDebug.store.state.coins += 20;
     win.AppDebug.store.save();
     win.AppDebug.show('house');
+    await pause(100);
+    assert(doc.querySelector('.room-background').src.includes('/assets/tiger/house/house-room-empty.png') && doc.querySelector('.room-background').naturalWidth === 1920, 'Approved empty room did not load');
+    assert(doc.querySelector('[data-tiger-state="house"]').src.includes('/assets/tiger/poses/tiger-house.png'), 'Tiger House pose is incorrect');
+    assert([...doc.querySelectorAll('.shop-icon img')].length === win.TigerHouse.catalogue.length && [...doc.querySelectorAll('.shop-icon img')].every(image => image.complete && image.naturalWidth === 1024), 'Shop artwork is missing');
     const pillow = [...doc.querySelectorAll('.shop-item')].find(card => card.textContent.includes('Cloud Pillow'));
     pillow.querySelector('button').click();
     const afterPurchase = win.AppDebug.store.state.coins;
     assert(win.AppDebug.store.state.tigerHouse.owned.includes('cloud-pillow'), 'Purchase did not persist in state');
     const duplicate = win.TigerHouse.purchase(win.AppDebug.store.state, 'cloud-pillow');
     assert(!duplicate.ok && win.AppDebug.store.state.coins === afterPurchase, 'Duplicate purchase charged twice');
-    await load(); win = frame.contentWindow;
+    await load(); win = frame.contentWindow; doc = frame.contentDocument;
     assert(win.AppDebug.store.state.tigerHouse.slots.pillow === 'cloud-pillow', 'Tiger House placement did not survive reload');
-    log('PASS: Tiger House purchase, duplicate protection and persistence');
+    win.AppDebug.show('house');
+    assert(doc.querySelector('.slot-pillow img')?.src.includes('/assets/tiger/items/house-pillow.png'), 'Equipped furniture did not use approved artwork');
+    win.AppDebug.store.state.coins += 300;
+    win.AppDebug.store.save();
+    [...doc.querySelectorAll('.shop-item')].find(card => card.textContent.includes('Peach Ribbon')).querySelector('button').click();
+    assert(doc.querySelector('.slot-accessory img')?.src.includes('/assets/tiger/items/tiger-ribbon.png'), 'Ribbon artwork did not equip');
+    [...doc.querySelectorAll('.shop-item')].find(card => card.textContent.includes('Sunny Hat')).querySelector('button').click();
+    assert(doc.querySelector('.slot-accessory img')?.src.includes('/assets/tiger/items/tiger-hat.png'), 'Hat artwork did not equip');
+    const tigerRect = doc.querySelector('.room-tiger').getBoundingClientRect();
+    const accessoryRect = doc.querySelector('.slot-accessory').getBoundingClientRect();
+    assert(Math.abs(tigerRect.left - accessoryRect.left) < 1 && Math.abs(tigerRect.width - accessoryRect.width) < 1 && Math.abs(tigerRect.bottom - accessoryRect.bottom) < 1, 'Wearable canvas is not aligned with Tiger');
+    assert(Number(win.getComputedStyle(doc.querySelector('.slot-accessory')).zIndex) > Number(win.getComputedStyle(doc.querySelector('.room-tiger')).zIndex), 'Wearable must layer above Tiger');
+    log('PASS: approved visual assets, Tiger House persistence, duplicate protection and aligned wearables');
 
     const oldCoins = win.AppDebug.store.state.coins;
     const originalDateKey = win.ProgressStore.dateKey;
@@ -213,14 +231,17 @@ document.getElementById('inspect').onclick = async () => {
     assert(registration?.active, 'No active service worker');
     for (let i = 0; i < 50 && (registration.installing || registration.waiting); i++) await pause(100);
     const names = (await caches.keys()).filter(name => name.startsWith('corinne-v'));
-    assert(names.length === 1 && names[0] === 'corinne-v0.3.1', 'Expected only the current V0.3 cache');
+    assert(names.length === 1 && names[0] === 'corinne-v0.3.2', 'Expected only the current V0.3.1 cache');
     const cache = await caches.open(names[0]);
     const keys = await cache.keys();
     assert(keys.filter(request => request.url.includes('/character-data/')).length === 19, 'Expected 19 character files');
-    for (const asset of ['index.html','app.js','audio.js','mission.js','practice.js','revision.js','rewards.js','freewrite.js','progress.js','curriculum/content.js','curriculum/tingxie.js','shop/tiger-house.js','tiger/assets.js','tiger/assets/tiger-placeholder.svg']) {
+    for (const asset of ['index.html','app.js','audio.js','mission.js','practice.js','revision.js','rewards.js','freewrite.js','progress.js','curriculum/content.js','curriculum/tingxie.js','shop/tiger-house.js','tiger/assets.js','assets/tiger/poses/tiger-home.png','assets/tiger/poses/tiger-house.png','assets/tiger/house/house-room-empty.png','assets/tiger/items/house-pillow.png','assets/tiger/items/tiger-ribbon.png','assets/tiger/items/tiger-hat.png','assets/tiger/icons/coin-icon.png','assets/tiger/icons/badge-star.png','icons/favicon-32.png']) {
       assert(await cache.match(new URL('../' + asset, location.href)), 'Missing cached asset: ' + asset);
     }
-    log('PASS: active V0.3 worker, offline app shell and all 19 character files');
+    for (const reference of ['assets/reference/tiger-character-sheet.png','assets/tiger/house/house-room-reference.png','assets/tiger/items/tiger-accessory-alignment-reference.png','assets/tiger/icons/app-icon-master.png']) {
+      assert(!await cache.match(new URL('../' + reference, location.href)), 'Reference-only file was cached: ' + reference);
+    }
+    log('PASS: active V0.3.1 worker, offline runtime artwork, app shell and all 19 character files');
   } catch (error) { log('FAIL: ' + error.message); }
 };
 </script>

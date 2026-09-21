@@ -2,6 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
+  const coinReward = (amount) => `<span class="coin-reward"><span>+${amount}</span><img src="${globalThis.TigerAssets.ui.coin}" alt="coin"></span>`;
   const set = globalThis.getActiveTingxie();
   const lesson = globalThis.getMoeLesson(set.lessonId);
   const items = set.items;
@@ -359,7 +360,7 @@
   function renderReward(host, mission) {
     claimMissionReward(mission);
     host.innerHTML = `${stageHeader("Reward", 0, 0)}
-      <div class="reward-scene"><img data-tiger-state="celebrate" class="tiger reward-tiger" alt="Happy tiger"><div class="coin-burst">+${mission.coinsEarned} 🪙</div></div>
+      <div class="reward-scene"><img class="reward-star" src="${globalThis.TigerAssets.ui.badge}" alt=""><img data-tiger-state="celebrate" class="tiger reward-tiger" alt="Happy tiger"><div class="coin-burst">${coinReward(mission.coinsEarned)}</div></div>
       <h2 class="center">Mission complete!</h2><p class="center">You practised ${mission.focusIds.length} spelling items and ${mission.writingCharacters.length} writing characters.</p>
       <div class="reward-actions"><button id="rewardHouse" class="btn primary">Visit Tiger House</button><button id="rewardHome" class="btn">Back home</button></div>`;
     $("rewardHouse").addEventListener("click", () => show("house"));
@@ -408,7 +409,7 @@
     if (session.completed) {
       const checks = Object.values(session.results).filter((result) => result.firstSelfCorrect !== null);
       const first = checks.filter((result) => result.firstSelfCorrect === true).length;
-      host.innerHTML = `${stageHeader("Practice complete", 0, 0)}<div class="reward-scene"><img data-tiger-state="celebrate" class="tiger reward-tiger" alt="Celebrating tiger"><div class="coin-burst">+${session.coinsEarned || 0} 🪙</div></div><h2 class="center">Great practice!</h2>${session.mode === "test" ? `<p class="center">First self-check: ${first} of ${checks.length} marked “Got it”.</p>` : ""}<button id="practiceDone" class="btn primary wide">Back to Practice 听写</button>`;
+      host.innerHTML = `${stageHeader("Practice complete", 0, 0)}<div class="reward-scene"><img data-tiger-state="celebrate" class="tiger reward-tiger" alt="Celebrating tiger"><div class="coin-burst">${coinReward(session.coinsEarned || 0)}</div></div><h2 class="center">Great practice!</h2>${session.mode === "test" ? `<p class="center">First self-check: ${first} of ${checks.length} marked “Got it”.</p>` : ""}<button id="practiceDone" class="btn primary wide">Back to Practice 听写</button>`;
       applyTigerAssets(host);
       $("practiceDone").addEventListener("click", () => { store.state.practiceSession = null; save(); show("practice"); });
       return;
@@ -549,7 +550,7 @@
     if (!session || session.date !== today) return show("revision");
     const host = $("revisionCard"); host.replaceChildren();
     if (session.completed) {
-      host.innerHTML = `${stageHeader("Revision complete", 0, 0)}<div class="reward-scene"><img data-tiger-state="happy" class="tiger reward-tiger" alt="Happy tiger"><div class="coin-burst">+${session.coinsEarned} 🪙</div></div><h2 class="center">Revision complete!</h2><button id="revisionDone" class="btn primary wide">Back to Revision</button>`;
+      host.innerHTML = `${stageHeader("Revision complete", 0, 0)}<div class="reward-scene"><img data-tiger-state="happy" class="tiger reward-tiger" alt="Happy tiger"><div class="coin-burst">${coinReward(session.coinsEarned)}</div></div><h2 class="center">Revision complete!</h2><button id="revisionDone" class="btn primary wide">Back to Revision</button>`;
       applyTigerAssets(host); $("revisionDone").addEventListener("click", () => { store.state.revisionSession = null; save(); show("revision"); }); return;
     }
     const activity = session.items[session.itemIndex];

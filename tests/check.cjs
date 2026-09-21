@@ -1,10 +1,15 @@
-// Dependency-free V0.3 checks used locally and by the Pages workflow.
+// Dependency-free V0.3.1 checks used locally and by the Pages workflow.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 process.chdir(path.join(__dirname, '..'));
 const source = name => fs.readFileSync(name, 'utf8');
+const pngSize = name => {
+  const data = fs.readFileSync(name);
+  assert.equal(data.toString('ascii', 1, 4), 'PNG', `${name} is not a PNG`);
+  return [data.readUInt32BE(16), data.readUInt32BE(20)];
+};
 
 (async () => {
   const modules = [
@@ -166,6 +171,8 @@ const source = name => fs.readFileSync(name, 'utf8');
   const house = ProgressStore.freshState(set.items, '2026-09-20'); house.coins = 50;
   assert(TigerHouse.purchase(house, 'cloud-pillow').ok); const after = house.coins;
   assert.equal(TigerHouse.purchase(house, 'cloud-pillow').reason, 'already-owned'); assert.equal(house.coins, after);
+  assert(TigerHouse.catalogue.every(item => item.image?.startsWith('./assets/tiger/items/')), 'Every shop item must use approved artwork');
+  assert.equal(JSON.stringify(TigerHouse.catalogue.filter(item => item.slot === 'accessory').map(item => item.id)), JSON.stringify(['peach-ribbon', 'sunny-hat']));
 
   let speechCalls = 0;
   const synthesis = { getVoices: () => [{ lang: 'zh-CN' }], cancel() {}, speak(utterance) { speechCalls += 1; utterance.onstart(); } };
@@ -216,18 +223,28 @@ const source = name => fs.readFileSync(name, 'utf8');
   const shell = vm.runInContext('APP_SHELL', worker);
   for (const file of shell) assert(fs.existsSync(decodeURIComponent(file)), `Missing offline asset: ${file}`);
   for (const file of ['practice.js','revision.js','rewards.js','freewrite.js','curriculum/content.js','tiger/assets.js']) assert(shell.includes(`./${file}`));
+  for (const file of [...Object.values(context.TigerAssets.paths), ...Object.values(context.TigerAssets.ui), ...TigerHouse.catalogue.map(item => item.image)]) assert(shell.includes(file), `Offline shell missing visual asset: ${file}`);
+  for (const reference of ['assets/reference/', 'house-room-reference.png', 'tiger-accessory-alignment-reference.png', 'app-icon-master.png', 'favicon-master.png']) assert(!shell.some(file => file.includes(reference)), `Reference-only file cached: ${reference}`);
   assert.equal(shell.filter(file => file.includes('character-data/')).length, chars.length);
   assert.equal(vm.runInContext('OPTIONAL_AUDIO.length', worker), set.items.length);
-  assert.match(source('sw.js'), /corinne-v0\.3\.1/);
+  assert.match(source('sw.js'), /corinne-v0\.3\.2/);
   const html = source('index.html');
   const homeMarkup = html.slice(html.indexOf('<section id="home"'), html.indexOf('<section id="mission"'));
   assert.equal((homeMarkup.match(/class="[^"]*home-choice/g) || []).length, 4, 'Home must expose exactly four choices');
+  assert(html.includes('./assets/tiger/house/house-room-empty.png') && !html.includes('house-room-reference.png'));
+  assert(html.includes('./assets/tiger/icons/coin-icon.png') && !source('app.js').includes('🪙'));
+  assert(!source('tiger/assets.js').includes('tiger-placeholder.svg'));
   assert(html.indexOf('curriculum/content.js') < html.indexOf('progress.js'));
   assert.match(appSource, /updateDimensions/); assert.match(appSource, /orientationchange/);
   const workflow = source('.github/workflows/pages.yml');
-  for (const asset of ['practice.js','revision.js','rewards.js','freewrite.js','curriculum','shop','tiger','audio','character-data','vendor']) assert(workflow.includes(asset), `Pages staging missing ${asset}`);
+  for (const asset of ['practice.js','revision.js','rewards.js','freewrite.js','curriculum','shop','tiger','audio','character-data','vendor','assets/tiger/poses','house-room-empty.png','assets/tiger/items','coin-icon.png','badge-star.png']) assert(workflow.includes(asset), `Pages staging missing ${asset}`);
+  for (const reference of ['assets/reference', 'house-room-reference.png', 'tiger-accessory-alignment-reference.png', 'app-icon-master.png', 'favicon-master.png']) assert(!workflow.includes(reference), `Pages stages reference-only file: ${reference}`);
   const manifest = JSON.parse(source('manifest.webmanifest'));
   assert.equal(manifest.start_url, './'); assert.equal(manifest.scope, './'); assert.equal(manifest.display, 'standalone');
+  assert.deepEqual(pngSize('icons/icon-192.png'), [192, 192]);
+  assert.deepEqual(pngSize('icons/icon-512.png'), [512, 512]);
+  assert.deepEqual(pngSize('icons/icon-maskable-512.png'), [512, 512]);
+  assert.deepEqual(pngSize('icons/favicon-32.png'), [32, 32]);
 
-  console.log(`PASS: V0.3 correction covers Practice 3/5 rotation, Quick/Full/Weak revision rotation and caps, unscored MOE review, set-scoped canonical IDs, no-ink guard, unchanged Mission/migration/rewards, ${chars.length} character files, offline shell, manifest, resizing and Pages readiness.`);
+  console.log(`PASS: V0.3.1 covers unchanged Practice/Revision/Mission/migration/rewards, approved Tiger and house assets, generated icons, ${chars.length} character files, offline shell, manifest, resizing and Pages readiness.`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

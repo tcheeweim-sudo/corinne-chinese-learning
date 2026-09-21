@@ -1,8 +1,8 @@
 # Corinne's 中文 Tiger
 
-A static, local-first Primary 1 Chinese PWA. V0.3 combines the existing five-minute mission with focused 听写 practice, parent-scoped revision, local progress, Hanzi Writer, and a coin-funded Tiger House.
+A static, local-first Primary 1 Chinese PWA. V0.3.1 combines the existing five-minute mission with focused 听写 practice, parent-scoped revision, local progress, Hanzi Writer, a coin-funded Tiger House, and the approved Tiger visual system.
 
-## V0.3 experience
+## V0.3.1 experience
 
 The home screen has four child-facing choices: **Today's Mission**, **Practice 听写**, **Revision**, and **Tiger House**. Parent settings remain behind a small grown-up link.
 
@@ -34,7 +34,7 @@ No build or package installation is required. With Node.js installed, run:
 node tests/server.cjs
 ```
 
-Open <http://127.0.0.1:8000/corinne-chinese-learning/>. This server uses the same project subdirectory shape as GitHub Pages and supplies the correct manifest, SVG, and audio MIME types.
+Open <http://127.0.0.1:8000/corinne-chinese-learning/>. This server uses the same project subdirectory shape as GitHub Pages and supplies the correct manifest, PNG, and audio MIME types.
 
 Run dependency-free checks with:
 
@@ -64,13 +64,13 @@ When approved files are added at the exact paths above, no curriculum or service
 
 ## Deploy to GitHub Pages
 
-1. Keep feature work on `codex/v0.3` and open a pull request for review. This branch does not deploy or change the live site.
+1. Keep feature work on `codex/v0.3.1-visual` and open a pull request for review. This branch does not deploy or change the live site.
 2. In **Settings → Pages → Build and deployment → Source**, select **GitHub Actions**.
 3. Merge the approved pull request into `main`. The `.github/workflows/pages.yml` workflow validates the app, stages only public files, and deploys only from `main`. Pull requests run validation without deployment.
 4. If the `github-pages` environment requires approval, approve the deployment in Actions.
 5. Open <https://tcheeweim-sudo.github.io/corinne-chinese-learning/> after the deploy job succeeds. This is the expected project URL, not a claim that V0.3 has been deployed.
 
-The staged site includes `curriculum/`, `shop/`, `tiger/`, `audio/`, `icons/`, `vendor/`, and `character-data/`. Relative URLs, manifest scope, and service-worker scope support the repository subdirectory.
+The staged site includes `curriculum/`, `shop/`, `tiger/`, `audio/`, `icons/`, `vendor/`, `character-data/`, and only the runtime files below `assets/tiger/`. Reference sheets and source masters live in Google Drive and are excluded from this public repository, the deployed site, and the offline cache. Relative URLs, manifest scope, and service-worker scope support the repository subdirectory.
 
 ## Install or update on Android
 
@@ -120,7 +120,8 @@ On visibility/resume and before mission actions, the app recalculates the local 
 
 ## Replaceable visual assets
 
-- Tiger: place approved files under `tiger/assets/` and update only the semantic paths in `tiger/assets.js` (`home`, `happy`, `celebrate`, `encourage`, `thinking`, `writing`, `sleeping`, `house`). All states currently use `tiger-placeholder.svg`.
-- Furniture: add approved images under tiger/assets/furniture/ and set each catalogue entry's image in shop/tiger-house.js to a relative URL such as ./tiger/assets/furniture/cloud-pillow.png. A null value uses the emoji placeholder; failed image loads also show that placeholder. The same image renders in the shop and preset room slot. The worker derives image paths from the catalogue and requires configured files for offline installation.
-- PWA icons: replace icons/icon-192.png, icons/icon-512.png and icons/icon-maskable-512.png with matching dimensions. Keep important maskable artwork inside the central safe area. Existing manifest and HTML references need no structural changes.
-- Increment the worker cache version whenever replacing assets. Run validation before deployment; GitHub Pages already stages tiger/ and icons/.
+- Runtime Tiger poses live in `assets/tiger/poses/`. `tiger/assets.js` maps `home`, `happy`, `celebrate`, `encourage`, `thinking`, `writing`, `sleeping`, and `house` to those files, so pose artwork can be replaced without changing screen logic.
+- Tiger House uses `assets/tiger/house/house-room-empty.png` plus individually layered files in `assets/tiger/items/`. Catalogue image paths stay in `shop/tiger-house.js`; preset slot CSS controls placement. Ribbon and hat share the accessory slot and are aligned by using the same canvas bounds as `tiger-house.png`.
+- Design references and source masters live in Google Drive. Their local working paths are ignored by Git and must not be referenced by the app, staged to Pages, or added to the service-worker cache.
+- The checked-in 192 px, 512 px, maskable, and favicon files were derived from the approved icon masters. Keep the Tiger face inside the maskable safe area when regenerating them. `coin-icon.png` and `badge-star.png` remain runtime UI art.
+- Increment the worker cache version whenever replacing runtime assets. Run validation and the browser smoke suite before deployment; Pages stages only the approved runtime subset.
