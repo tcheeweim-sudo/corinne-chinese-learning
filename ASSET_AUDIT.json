@@ -1,0 +1,245 @@
+[
+  {
+    "file": "assets/reference/tiger-character-sheet.png",
+    "size": [
+      1448,
+      1086
+    ],
+    "mode": "RGB",
+    "transparent": false
+  },
+  {
+    "file": "assets/reference/tiger-design-details.png",
+    "size": [
+      416,
+      405
+    ],
+    "mode": "RGB",
+    "transparent": false
+  },
+  {
+    "file": "assets/reference/tiger-style-reference.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGB",
+    "transparent": false
+  },
+  {
+    "file": "assets/tiger/poses/tiger-home.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/poses/tiger-happy.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/poses/tiger-celebrate.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/poses/tiger-encourage.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/poses/tiger-thinking.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/poses/tiger-writing.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/poses/tiger-sleeping.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/poses/tiger-house.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/house/house-room-empty.png",
+    "size": [
+      1920,
+      1200
+    ],
+    "mode": "RGB",
+    "transparent": false
+  },
+  {
+    "file": "assets/tiger/house/house-room-reference.png",
+    "size": [
+      1920,
+      1200
+    ],
+    "mode": "RGB",
+    "transparent": false
+  },
+  {
+    "file": "assets/tiger/items/house-bed.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/items/house-pillow.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/items/house-rug.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/items/house-lamp.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/items/house-plant.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/items/house-picture.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/items/house-basket.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/items/tiger-ribbon.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/items/tiger-hat.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/items/tiger-accessory-alignment-reference.png",
+    "size": [
+      2048,
+      1024
+    ],
+    "mode": "RGB",
+    "transparent": false
+  },
+  {
+    "file": "assets/tiger/icons/app-icon-master.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGB",
+    "transparent": false
+  },
+  {
+    "file": "assets/tiger/icons/coin-icon.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/icons/badge-star.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  },
+  {
+    "file": "assets/tiger/icons/favicon-master.png",
+    "size": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "transparent": true
+  }
+]

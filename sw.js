@@ -1,10 +1,10 @@
 importScripts("./curriculum/moe-p1-standard.js", "./curriculum/tingxie.js", "./shop/tiger-house.js", "./tiger/assets.js");
-const CACHE_NAME = "corinne-v0.3.1";
+const CACHE_NAME = "corinne-v0.3.2";
 const APP_SHELL = [
   "./", "./index.html", "./styles.css", "./app.js", "./audio.js", "./mission.js", "./practice.js", "./revision.js", "./rewards.js", "./progress.js", "./freewrite.js",
   "./curriculum/moe-p1-standard.js", "./curriculum/tingxie.js", "./curriculum/content.js", "./shop/tiger-house.js", "./tiger/assets.js",
-  ...new Set(Object.values(globalThis.TigerAssets.paths)), "./manifest.webmanifest", "./vendor/hanzi-writer.min.js",
-  "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-512.png",
+  ...new Set(Object.values(globalThis.TigerAssets.paths)), ...new Set(Object.values(globalThis.TigerAssets.ui)), "./manifest.webmanifest", "./vendor/hanzi-writer.min.js",
+  "./icons/favicon-32.png", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-512.png",
   ...globalThis.TigerHouse.catalogue.map((item) => item.image).filter(Boolean),
   ...globalThis.REQUIRED_CHARACTERS.map((character) => `./character-data/${encodeURIComponent(character)}.json`)
 ];

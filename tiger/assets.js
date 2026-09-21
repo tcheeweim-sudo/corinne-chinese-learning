@@ -1,8 +1,19 @@
 globalThis.TigerAssets = (() => {
-  const fallback = "./tiger/assets/tiger-placeholder.svg";
   const paths = {
-    home: fallback, happy: fallback, celebrate: fallback, encourage: fallback,
-    thinking: fallback, writing: fallback, sleeping: fallback, house: fallback
+    home: "./assets/tiger/poses/tiger-home.png",
+    happy: "./assets/tiger/poses/tiger-happy.png",
+    celebrate: "./assets/tiger/poses/tiger-celebrate.png",
+    encourage: "./assets/tiger/poses/tiger-encourage.png",
+    thinking: "./assets/tiger/poses/tiger-thinking.png",
+    writing: "./assets/tiger/poses/tiger-writing.png",
+    sleeping: "./assets/tiger/poses/tiger-sleeping.png",
+    house: "./assets/tiger/poses/tiger-house.png"
   };
-  return { fallback, paths, get: (state) => paths[state] || fallback };
+  const ui = {
+    houseBackground: "./assets/tiger/house/house-room-empty.png",
+    coin: "./assets/tiger/icons/coin-icon.png",
+    badge: "./assets/tiger/icons/badge-star.png"
+  };
+  const fallback = paths.home;
+  return { fallback, paths, ui, get: (state) => paths[state] || fallback };
 })();
